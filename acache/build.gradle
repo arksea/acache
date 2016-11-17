@@ -18,14 +18,3 @@ configure(install.repositories.mavenInstaller) {
         version = mavenVersion
     }
 }
-
-uploadArchives {
-    repositories.mavenDeployer {
-        repository(url: "http://172.17.149.8:8081/nexus/content/repositories/releases") {
-            authentication(userName: "admin", password: "admin123")
-        }
-        snapshotRepository(url: "http://172.17.149.8:8081/nexus/content/repositories/snapshots") {
-            authentication(userName: "admin", password: "admin123")
-        }
-    }
-}.dependsOn(assemble)

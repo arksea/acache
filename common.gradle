@@ -15,11 +15,6 @@ repositories {
 }
 
 dependencies {
-    compile  'com.felink:flume-client:1.0.1'
-    compile  'org.apache.thrift:libthrift:0.9.1'
-    compile 'org.springframework:spring-core:4.2.2.RELEASE'
-    compile 'org.springframework:spring-context:4.2.2.RELEASE'
-    compile 'org.springframework:spring-context-support:4.2.2.RELEASE'
     compile 'commons-codec:commons-codec:1.9'
     compile 'org.aspectj:aspectjweaver:1.7.4'
     compile 'com.google.guava:guava:17.0'
@@ -74,13 +69,11 @@ pmd {
     'java-basic',
     'java-braces',
     'java-clone',
-    //'java-codesize',
     'java-design',
     'java-empty',
     'java-finalizers',
     'java-imports',
     'java-migrating',
-    //'java-optimizations',
     'java-sunsecure',
     'java-unnecessary',
     'java-unusedcode'
