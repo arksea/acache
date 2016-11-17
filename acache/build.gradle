@@ -1,0 +1,31 @@
+apply plugin: 'base'
+apply plugin: 'java'
+apply plugin: 'maven'
+
+String mavenVersion = '0.1-SNAPSHOT'
+version = mavenVersion
+
+description = """A Cache"""
+String mavenArtifactId = name
+
+dependencies {
+}
+
+configure(install.repositories.mavenInstaller) {
+    pom.project {
+        groupId = group
+        artifactId = mavenArtifactId
+        version = mavenVersion
+    }
+}
+
+uploadArchives {
+    repositories.mavenDeployer {
+        repository(url: "http://172.17.149.8:8081/nexus/content/repositories/releases") {
+            authentication(userName: "admin", password: "admin123")
+        }
+        snapshotRepository(url: "http://172.17.149.8:8081/nexus/content/repositories/snapshots") {
+            authentication(userName: "admin", password: "admin123")
+        }
+    }
+}.dependsOn(assemble)
