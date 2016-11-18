@@ -1,9 +1,12 @@
 package net.arksea.acache;
 
 import akka.actor.ActorRef;
+import akka.actor.Props;
 import akka.actor.UntypedActor;
+import akka.cluster.Cluster;
 import akka.dispatch.OnFailure;
 import akka.dispatch.OnSuccess;
+import akka.japi.Creator;
 import akka.pattern.Patterns;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -26,10 +29,32 @@ public class CacheActor<TKey, TData> extends UntypedActor {
     private static final Logger log = LogManager.getLogger(CacheActor.class);
     private final CacheActorState<TKey,TData> state;
     private final String cacheName;
+    private final Cluster cluster = Cluster.get(getContext().system());
 
-    public CacheActor(String cacheName, CacheActorState<TKey,TData> state) {
+    private CacheActor(String cacheName, CacheActorState<TKey,TData> state) {
         this.cacheName = cacheName;
         this.state = state;
+    }
+
+    //Actor重启时继承原Actor状态与缓存
+    public static <TKey,TData> Props heritableProps(String cacheName, final ICacheConfig config, final IDataSource<TKey,TData> dataRequest) {
+        return Props.create(CacheActor.class, new Creator<CacheActor>() {
+            CacheActorState<TKey,TData> state = new CacheActorState<>(config,dataRequest);
+            @Override
+            public CacheActor<TKey, TData> create() throws Exception {
+                return new CacheActor<>(cacheName, state);
+            }
+        });
+    }
+
+    //Actor重启时新建缓存
+    public static <TKey,TData> Props props(String cacheName, final ICacheConfig config, final IDataSource<TKey,TData> dataRequest) {
+        return Props.create(CacheActor.class, new Creator<CacheActor>() {
+            @Override
+            public CacheActor<TKey, TData> create() throws Exception {
+                return new CacheActor<>(cacheName, new CacheActorState<>(config,dataRequest));
+            }
+        });
     }
 
     public static Future<DataResult> ask(GetData get, long timeout) {
