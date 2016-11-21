@@ -10,9 +10,9 @@ import java.util.Map;
 public class CacheActorState<TKey, TData> {
     public final Map<TKey, CachedItem<TKey,TData>> cacheMap = new HashMap<>();
     public final ICacheConfig config;
-    public final IDataSource<TKey,TData> dataRequestor;
-    public CacheActorState(final ICacheConfig config, IDataSource<TKey,TData> dataRequestor) {
+    public final IDataSource<TKey,TData> dataSource;
+    public CacheActorState(final ICacheConfig config, IDataSource<TKey,TData> dataSource) {
         this.config = config;
-        this.dataRequestor = dataRequestor;
+        this.dataSource = dataSource;
     }
 }
