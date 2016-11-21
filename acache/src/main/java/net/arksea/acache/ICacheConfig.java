@@ -8,4 +8,5 @@ public interface ICacheConfig {
     long getIdleTimeout();
     long getLiveTimeout();
     long getMaxBackoff();
+    boolean updateFromMaster();
 }
