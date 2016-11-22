@@ -3,6 +3,7 @@ package net.arksea.acache;
 import akka.actor.*;
 import akka.cluster.Cluster;
 import akka.cluster.ClusterEvent;
+import akka.cluster.Member;
 import akka.dispatch.OnFailure;
 import akka.dispatch.OnSuccess;
 import akka.japi.Creator;
@@ -57,8 +58,8 @@ public class CacheActor<TKey, TData> extends UntypedActor {
         });
     }
 
-    public static Future<DataResult> ask(GetData get, long timeout) {
-        return Patterns.ask(get.cacheActor, get, timeout)
+    public static Future<DataResult> ask(ActorRef cacheActor, GetData get, long timeout) {
+        return Patterns.ask(cacheActor, get, timeout)
             .mapTo(classTag(DataResult.class));
     }
 
@@ -83,14 +84,16 @@ public class CacheActor<TKey, TData> extends UntypedActor {
     @Override
     @SuppressWarnings("unchecked")
     public void onReceive(Object o) {
-        if (o instanceof CleanTick) {
-            handleCleanTick();
-        } else if (o instanceof GetData) {
+        if (o instanceof GetData) {
             handleGetData((GetData<TKey>)o);
         } else if (o instanceof DataResult) {
-            handleUpdate((DataResult<TKey,TData>)o);
+            handleDataResult((DataResult<TKey, TData>) o);
+        } else if (o instanceof ModifyData) {
+            handleModifyData((ModifyData)o);
         } else if (o instanceof Failed) {
-            handleFailed((Failed<TKey>)o);
+            handleFailed((Failed<TKey>) o);
+        } else if (o instanceof CleanTick) {
+            handleCleanTick();
         } else if (o instanceof ClusterEvent.LeaderChanged) {
             ClusterEvent.LeaderChanged msg = (ClusterEvent.LeaderChanged) o;
             checkLeader(msg.getLeader());
@@ -104,7 +107,7 @@ public class CacheActor<TKey, TData> extends UntypedActor {
             unhandled(o);
         }
     }
-
+    //-------------------------------------------------------------------------------------
     private void handleGetData(final GetData<TKey> req) {
         final String cacheName = self().path().name();
         final CachedItem<TKey,TData> item = state.cacheMap.get(req.key);
@@ -128,45 +131,108 @@ public class CacheActor<TKey, TData> extends UntypedActor {
 
     private void requestData(final GetData<TKey> req) {
         try {
-            if (selfIsLeader || !state.config.updateFromMaster()) {
-                requestFromSource(req);
+            if (selfIsLeader || !state.config.updateByMaster()) {
+                final Future<TData> future = state.dataSource.request(req.key);
+                onSuccessData(req.key, future);
+                onFailureData(req.key, future);
             } else {
-                requestFromMaster(req);
+                Future<DataResult<TKey, TData>> future = Patterns.ask(leader, req, ASK_TIMEOUT)
+                    .mapTo(classTag((Class<DataResult<TKey, TData>>) (Class<?>) DataResult.class));
+                onSuccessResult(req.key, future);
+                onFailureResult(req.key, future);
             }
         } catch (Exception ex) {
             handleFailed(new Failed<>(req.key,sender(),ex));
         }
     }
-
-    private void requestFromSource(final GetData<TKey> req) {
+    //-------------------------------------------------------------------------------------
+    private void handleDataResult(final DataResult<TKey,TData> req) {
+        final String cacheName = self().path().name();
+        CachedItem<TKey,TData> item = state.cacheMap.get(req.key);
+        if (item == null) {
+            log.trace("({})新建缓存，key={}", cacheName, req.key);
+            item = new CachedItem<>(req.key);
+            state.cacheMap.put(req.key, item);
+        } else {
+            log.trace("({})更新缓存,key={},data={}", cacheName, req.key, req.data);
+        }
+        item.setData(req.data);
+        //同步数据到集群，注意：发送同步数据时重新new了一个sync参数为false的DataResult
+        //此为冗余安全保护措施，防止多个节点都认为自己是Master时系统因自激震荡而崩溃
+        if (req.sync && selfIsLeader && state.config.autoSync()) {
+            DataResult<TKey,TData> data = new DataResult<>(req.cacheName, req.key, req.data, false);
+            for (Member m : cluster.state().getMembers()) {
+                if (!cluster.selfAddress().equals(m.address())) {
+                    ActorSelection s = context().actorSelection(self().path().toStringWithAddress(m.address()));
+                    s.tell(data, self());
+                }
+            }
+        }
+    }
+    //-------------------------------------------------------------------------------------
+    private void handleFailed(final Failed<TKey> failed) {
+        final String cacheName = self().path().name();
+        final CachedItem item = state.cacheMap.get(failed.key);
+        if (item==null) {
+            log.warn("({})请求新数据失败；无可用数据，通知请求者已失败，key={}", cacheName, failed.key, failed.error);
+            DataResult result = new DataResult<>(cacheName, failed.key, failed.error);
+            failed.requester.tell(result, self());
+        } else {
+            log.warn("({})请求新数据失败；使用旧数据返回请求者，key={}, data={}", cacheName, failed.key, item.getData(), failed.error);
+            DataResult result = new DataResult<>(cacheName, failed.key, item.getData());
+            failed.requester.tell(result, self());
+        }
+    }
+    //-------------------------------------------------------------------------------------
+    private void handleModifyData(ModifyData<TKey,TData> req) {
+        final String cacheName = self().path().name();
+        try {
+            if (selfIsLeader || !state.config.updateByMaster()) {
+                final Future<TData> future = state.dataSource.modify(req.key, req.modifier);
+                onSuccessData(req.key, future);
+                onFailureData(req.key, future);
+            } else {
+                Future<DataResult<TKey, TData>> future = Patterns.ask(leader, req, ASK_TIMEOUT)
+                    .mapTo(classTag((Class<DataResult<TKey, TData>>) (Class<?>) DataResult.class));
+                onSuccessResult(req.key, future);
+                onFailureResult(req.key, future);
+            }
+        } catch (Exception ex) {
+            log.warn("({})修改缓存失败；key={}", cacheName, req.key, ex);
+        }
+    }
+    //-------------------------------------------------------------------------------------
+    private void onSuccessData(final TKey key, final Future<TData> future) {
         final String cacheName = self().path().name();
         final ActorRef requester = sender();
         final OnSuccess<TData> onSuccess = new OnSuccess<TData>() {
             @Override
             public void onSuccess(TData data) throws Throwable {
                 if (data == null) {
-                    Failed failed = new Failed<>(req.key,requester, new IllegalArgumentException("("+cacheName+") CacheActor的数据源返回Null"));
+                    Failed failed = new Failed<>(key,requester, new IllegalArgumentException("("+cacheName+") CacheActor的数据源返回Null"));
                     self().tell(failed, self());
                 } else {
-                    DataResult result = new DataResult<>(cacheName, req.key, data);
-                    self().tell(result, self());
-                    requester.tell(result, self());
+                    self().tell(new DataResult<>(cacheName, key, data, true), self());
+                    requester.tell(new DataResult<>(cacheName, key, data, false), self());
                 }
             }
         };
+        future.onSuccess(onSuccess, context().dispatcher());
+    }
+
+    private void onFailureData(final TKey key, final Future<TData> future) {
+        final ActorRef requester = sender();
         final OnFailure onFailure = new OnFailure(){
             @Override
             public void onFailure(Throwable error) throws Throwable {
-                Failed failed = new Failed<>(req.key,requester, error);
+                Failed failed = new Failed<>(key,requester, error);
                 self().tell(failed, self());
             }
         };
-        final Future<TData> future = state.dataSource.request(req.key);
-        future.onSuccess(onSuccess, context().dispatcher());
         future.onFailure(onFailure, context().dispatcher());
     }
 
-    private void requestFromMaster(final GetData<TKey> req) {
+    private void onSuccessResult(final TKey key, final Future<DataResult<TKey, TData>> future) {
         final ActorRef requester = sender();
         final OnSuccess<DataResult<TKey, TData>> onSuccess = new OnSuccess<DataResult<TKey, TData>>() {
             @Override
@@ -179,44 +245,19 @@ public class CacheActor<TKey, TData> extends UntypedActor {
                 }
             }
         };
+        future.onSuccess(onSuccess, context().dispatcher());
+    }
+
+    private void onFailureResult(final TKey key, final Future<DataResult<TKey, TData>> future) {
+        final ActorRef requester = sender();
         final OnFailure onFailure = new OnFailure(){
             @Override
             public void onFailure(Throwable error) throws Throwable {
-                Failed failed = new Failed<>(req.key, requester, error);
+                Failed failed = new Failed<>(key, requester, error);
                 self().tell(failed, self());
             }
         };
-        Future<DataResult<TKey, TData>> future = Patterns.ask(leader, new GetData<TKey>(leader.anchor(), req.key), ASK_TIMEOUT)
-            .mapTo(classTag((Class<DataResult<TKey, TData>>) (Class<?>) DataResult.class));
-        future.onSuccess(onSuccess, context().dispatcher());
         future.onFailure(onFailure, context().dispatcher());
-    }
-
-    private void handleUpdate(final DataResult<TKey,TData> req) {
-        final String cacheName = self().path().name();
-        CachedItem<TKey,TData> item = state.cacheMap.get(req.key);
-        if (item == null) {
-            log.trace("({})新建缓存，key={}", cacheName, req.key);
-            item = new CachedItem<>(req.key);
-            state.cacheMap.put(req.key, item);
-        } else {
-            log.trace("({})更新缓存,key={},data={}", cacheName, req.key, req.data);
-        }
-        item.setData(req.data);
-    }
-
-    private void handleFailed(final Failed<TKey> failed) {
-        final String cacheName = self().path().name();
-        final CachedItem item = state.cacheMap.get(failed.key);
-        if (item==null) {
-            log.warn("({})更新缓存失败；无可用数据，通知请求者已失败，key={}", cacheName, failed.key, failed.error);
-            DataResult result = new DataResult<>(cacheName, failed.key, failed.error);
-            failed.requester.tell(result, self());
-        } else {
-            log.warn("({})更新缓存失败；使用旧数据返回请求者，key={}, data={}", cacheName, failed.key, item.getData(), failed.error);
-            DataResult result = new DataResult<>(cacheName, failed.key, item.getData());
-            failed.requester.tell(result, self());
-        }
     }
 
     /**

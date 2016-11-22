@@ -8,4 +8,5 @@ import scala.concurrent.Future;
  */
 public interface IDataSource<TKey, TData> {
     Future<TData> request(TKey key);
+    Future<TData> modify(TKey key, IDataModifier<TData> modifier);
 }
