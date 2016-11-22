@@ -138,7 +138,7 @@ public class CacheActor<TKey, TData> extends UntypedActor {
             } else {
                 Future<DataResult<TKey, TData>> future = Patterns.ask(leader, req, ASK_TIMEOUT)
                     .mapTo(classTag((Class<DataResult<TKey, TData>>) (Class<?>) DataResult.class));
-                onSuccessResult(req.key, future);
+                onSuccessResult(future);
                 onFailureResult(req.key, future);
             }
         } catch (Exception ex) {
@@ -194,7 +194,7 @@ public class CacheActor<TKey, TData> extends UntypedActor {
             } else {
                 Future<DataResult<TKey, TData>> future = Patterns.ask(leader, req, ASK_TIMEOUT)
                     .mapTo(classTag((Class<DataResult<TKey, TData>>) (Class<?>) DataResult.class));
-                onSuccessResult(req.key, future);
+                onSuccessResult(future);
                 onFailureResult(req.key, future);
             }
         } catch (Exception ex) {
@@ -232,7 +232,7 @@ public class CacheActor<TKey, TData> extends UntypedActor {
         future.onFailure(onFailure, context().dispatcher());
     }
 
-    private void onSuccessResult(final TKey key, final Future<DataResult<TKey, TData>> future) {
+    private void onSuccessResult(final Future<DataResult<TKey, TData>> future) {
         final ActorRef requester = sender();
         final OnSuccess<DataResult<TKey, TData>> onSuccess = new OnSuccess<DataResult<TKey, TData>>() {
             @Override

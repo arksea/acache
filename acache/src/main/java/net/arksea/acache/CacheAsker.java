@@ -7,7 +7,6 @@ import akka.dispatch.OnComplete;
 import akka.japi.tuple.Tuple3;
 import akka.japi.tuple.Tuple4;
 import akka.pattern.Patterns;
-import akka.routing.ConsistentHashingRouter;
 import net.arksea.base.functional.Consumer2;
 import net.arksea.base.functional.Consumer3;
 import scala.Tuple2;

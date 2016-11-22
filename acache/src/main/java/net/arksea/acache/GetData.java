@@ -1,6 +1,5 @@
 package net.arksea.acache;
 
-import akka.actor.ActorRef;
 import akka.routing.ConsistentHashingRouter;
 
 /**
