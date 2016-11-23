@@ -79,7 +79,3 @@ pmd {
     'java-unusedcode'
     ]
 }
-
-pmdMain {
-    excludes = ["net/arksea/acache/CacheActor.java"]
-}
