@@ -2,7 +2,6 @@ package net.arksea.acache;
 
 import akka.actor.*;
 import akka.cluster.Cluster;
-import akka.cluster.ClusterEvent;
 import akka.cluster.Member;
 import akka.dispatch.OnFailure;
 import akka.dispatch.OnSuccess;
@@ -21,8 +20,6 @@ import static akka.japi.Util.classTag;
 public class MasterSlaveCacheActor<TKey, TData> extends CacheActor<TKey, TData> {
 
     protected static final Logger log = LogManager.getLogger(MasterSlaveCacheActor.class);
-    private boolean selfIsLeader = true;
-    private ActorSelection leader;
     private final Cluster cluster = Cluster.get(getContext().system());
 
     public MasterSlaveCacheActor(CacheActorState<TKey,TData> state) {
@@ -41,37 +38,20 @@ public class MasterSlaveCacheActor<TKey, TData> extends CacheActor<TKey, TData> 
     }
 
     @Override
-    public void preStart() {
-        super.preStart();
-        cluster.subscribe(self(), ClusterEvent.ClusterDomainEvent.class);
-    }
-
-    @Override
     @SuppressWarnings("unchecked")
     protected void handleOthers(Object o) {
-        if (o instanceof ClusterEvent.LeaderChanged) {
-            ClusterEvent.LeaderChanged msg = (ClusterEvent.LeaderChanged) o;
-            checkLeader(msg.getLeader());
-        } else if (o instanceof ClusterEvent.RoleLeaderChanged) {
-            ClusterEvent.RoleLeaderChanged msg = (ClusterEvent.RoleLeaderChanged) o;
-            checkLeader(msg.getLeader());
-        } else if (o instanceof ClusterEvent.CurrentClusterState) {
-            ClusterEvent.CurrentClusterState msg = (ClusterEvent.CurrentClusterState)o;
-            checkLeader(msg.getLeader());
-        } else {
-            unhandled(o);
-        }
+        unhandled(o);
     }
     //-------------------------------------------------------------------------------------
     @Override
     protected void requestData(final GetData<TKey> req) {
         try {
-            if (selfIsLeader || !state.config.updateByMaster()) {
+            if (selfIsLeader() || !state.config.updateByMaster()) {
                 final Future<TData> future = state.dataSource.request(req.key);
                 onSuccessData(req.key, future);
                 onFailureData(req.key, future);
             } else {
-                Future<DataResult<TKey, TData>> future = Patterns.ask(leader, req, ASK_TIMEOUT)
+                Future<DataResult<TKey, TData>> future = Patterns.ask(getLeader(), req, ASK_TIMEOUT)
                     .mapTo(classTag((Class<DataResult<TKey, TData>>) (Class<?>) DataResult.class));
                 onSuccessResult(future);
                 onFailureResult(req.key, future);
@@ -86,7 +66,7 @@ public class MasterSlaveCacheActor<TKey, TData> extends CacheActor<TKey, TData> 
         super.handleDataResult(req);
         //同步数据到集群，注意：发送同步数据时重新new了一个sync参数为false的DataResult
         //此为冗余安全保护措施，防止多个节点都认为自己是Master时系统因自激震荡而崩溃
-        if (req.sync && selfIsLeader && state.config.autoSync()) {
+        if (req.sync && selfIsLeader() && state.config.autoSync()) {
             DataResult<TKey,TData> data = new DataResult<>(req.cacheName, req.key, req.data, false);
             for (Member m : cluster.state().getMembers()) {
                 if (!cluster.selfAddress().equals(m.address())) {
@@ -101,12 +81,12 @@ public class MasterSlaveCacheActor<TKey, TData> extends CacheActor<TKey, TData> 
     protected void handleModifyData(ModifyData<TKey,TData> req) {
         final String cacheName = self().path().name();
         try {
-            if (selfIsLeader || !state.config.updateByMaster()) {
+            if (selfIsLeader() || !state.config.updateByMaster()) {
                 final Future<TData> future = state.dataSource.modify(req.key, req.modifier);
                 onSuccessData(req.key, future);
                 onFailureData(req.key, future);
             } else {
-                Future<DataResult<TKey, TData>> future = Patterns.ask(leader, req, ASK_TIMEOUT)
+                Future<DataResult<TKey, TData>> future = Patterns.ask(getLeader(), req, ASK_TIMEOUT)
                     .mapTo(classTag((Class<DataResult<TKey, TData>>) (Class<?>) DataResult.class));
                 onSuccessResult(future);
                 onFailureResult(req.key, future);
@@ -144,9 +124,12 @@ public class MasterSlaveCacheActor<TKey, TData> extends CacheActor<TKey, TData> 
         future.onFailure(onFailure, context().dispatcher());
     }
 
-    private void checkLeader(Address leaderAddr) {
-        leader = context().actorSelection(self().path().toStringWithAddress(leaderAddr));
-        selfIsLeader = cluster.selfAddress().equals(leaderAddr);
-        log.info("({}) CacheActor Leader's Address: {}", self().path().name(), leaderAddr);
+    private ActorSelection getLeader() {
+        Address address = cluster.state().getLeader();
+        return context().actorSelection(self().path().toStringWithAddress(address));
+    }
+
+    private boolean selfIsLeader() {
+        return cluster.selfAddress().equals(cluster.state().getLeader());
     }
 }
