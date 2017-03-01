@@ -15,34 +15,17 @@ repositories {
 }
 
 dependencies {
-    compile 'commons-codec:commons-codec:1.9'
-    compile 'org.aspectj:aspectjweaver:1.7.4'
-    compile 'com.google.guava:guava:17.0'
-    compile 'org.apache.commons:commons-lang3:3.3.2'
     compile 'com.typesafe.akka:akka-actor_2.11:2.4.8'
     compile 'com.typesafe.akka:akka-remote_2.11:2.4.8'
     compile 'com.typesafe.akka:akka-cluster_2.11:2.4.8'
     compile 'com.typesafe.akka:akka-slf4j_2.11:2.4.8'
     compile 'org.scala-lang:scala-library:2.11.8'
     compile 'org.apache.logging.log4j:log4j-api:2.5'
-    compile 'org.apache.logging.log4j:log4j-core:2.5'
-
-    //Log4j 1.x Bridge to Log4j 2.x
-    compile 'org.apache.logging.log4j:log4j-1.2-api:2.5'
-    //Apache Commons Logging Bridge to Log4j 2.x
-    compile 'org.apache.logging.log4j:log4j-jcl:2.5'
-    //slf4j Bridge to Log4j 2.x
-    compile 'org.apache.logging.log4j:log4j-slf4j-impl:2.5'
-    //Java Util Logging Bridge to Log4j 2.x
-    compile 'org.apache.logging.log4j:log4j-jul:2.5'
-    compile 'org.assertj:assertj-core:1.6.1'
-    compile 'redis.clients:jedis:2.8.1'
 
     testCompile 'junit:junit:4.11'
     testCompile 'org.assertj:assertj-core:1.6.1'
     testCompile 'org.springframework:spring-test:4.2.2.RELEASE'
     testCompile 'org.mockito:mockito-core:1.9.5'
-    testCompile 'com.googlecode.catch-exception:catch-exception:1.2.0'
 }
 
 //IDE中运行与调试的配置
