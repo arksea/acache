@@ -47,6 +47,11 @@ public class CacheActor<TKey, TData> extends UntypedActor {
             .mapTo(classTag(DataResult.class));
     }
 
+    public static Future<DataResult> ask(ActorSelection cacheActor, GetData get, long timeout) {
+        return Patterns.ask(cacheActor, get, timeout)
+            .mapTo(classTag(DataResult.class));
+    }
+
     @Override
     public void preStart() {
         //当IdleTimeout不为零时，启动过期缓存清除定时器
@@ -93,10 +98,10 @@ public class CacheActor<TKey, TData> extends UntypedActor {
         if (item == null) { //缓存的初始状态，新建一个CachedItem，从数据源读取数据
             log.trace("({})缓存未命中，发起更新请求，key={}", cacheName, req.key);
             requestData(req);
-        } else if (item.isTimeout(state.config.getLiveTimeout())) { //数据已过期
+        } else if (item.isTimeout(state.config.getLiveTimeout(item.key))) { //数据已过期
             if (item.isUpdateBackoff()) {
                 log.trace("({})缓存过期，更新请求Backoff中，key={}", cacheName, req.key);
-                sender().tell(new DataResult<>(cacheName, req.key, item.getData()), getSelf());
+                sender().tell(new DataResult<>(cacheName, req.key, item.getData(), false), getSelf());
             } else {
                 log.trace("({})缓存过期，发起更新请求，key={}", cacheName, req.key);
                 item.onRequestUpdate(state.config.getMaxBackoff());
@@ -128,7 +133,7 @@ public class CacheActor<TKey, TData> extends UntypedActor {
         } else {
             log.trace("({})更新缓存,key={},data={}", cacheName, req.key, req.data);
         }
-        item.setData(req.data);
+        item.setData(req.data, req.newest);
     }
     //-------------------------------------------------------------------------------------
     protected void handleFailed(final Failed<TKey> failed) {
@@ -136,11 +141,11 @@ public class CacheActor<TKey, TData> extends UntypedActor {
         final CachedItem item = state.cacheMap.get(failed.key);
         if (item==null) {
             log.warn("({})请求新数据失败；无可用数据，通知请求者已失败，key={}", cacheName, failed.key, failed.error);
-            DataResult result = new DataResult<>(cacheName, failed.key, failed.error);
+            DataResult result = new DataResult<>(failed.error, cacheName, failed.key);
             failed.requester.tell(result, self());
         } else {
             log.warn("({})请求新数据失败；使用旧数据返回请求者，key={}, data={}", cacheName, failed.key, item.getData(), failed.error);
-            DataResult result = new DataResult<>(cacheName, failed.key, item.getData());
+            DataResult result = new DataResult<>(cacheName, failed.key, item.getData(), false);
             failed.requester.tell(result, self());
         }
     }
@@ -166,8 +171,8 @@ public class CacheActor<TKey, TData> extends UntypedActor {
                     Failed failed = new Failed<>(key,requester, new IllegalArgumentException("("+cacheName+") CacheActor的数据源返回Null"));
                     self().tell(failed, self());
                 } else {
-                    self().tell(new DataResult<>(cacheName, key, data, true), self());
-                    requester.tell(new DataResult<>(cacheName, key, data, false), self());
+                    self().tell(new DataResult<>(cacheName, key, data), self());
+                    requester.tell(new DataResult<>(cacheName, key, data), self());
                 }
             }
         };

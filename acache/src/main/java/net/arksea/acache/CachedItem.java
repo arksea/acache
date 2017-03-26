@@ -20,10 +20,12 @@ class CachedItem<TKey, TData> {
         return data;
     }
 
-    public void setData(TData data) {
-        this.updateTime = System.currentTimeMillis();
+    public void setData(TData data, boolean update) {
+        if (update) {
+            this.updateTime = System.currentTimeMillis();
+            this.retryBackoff = MIN_RETRY_BACKOFF;
+        }
         this.data = data;
-        this.retryBackoff = MIN_RETRY_BACKOFF;
     }
 
     public void onRequestUpdate(long maxRetryBackoff) {

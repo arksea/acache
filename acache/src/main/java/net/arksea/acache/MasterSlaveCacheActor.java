@@ -67,7 +67,7 @@ public class MasterSlaveCacheActor<TKey, TData> extends CacheActor<TKey, TData> 
         //同步数据到集群，注意：发送同步数据时重新new了一个sync参数为false的DataResult
         //此为冗余安全保护措施，防止多个节点都认为自己是Master时系统因自激震荡而崩溃
         if (req.sync && selfIsLeader() && state.config.autoSync()) {
-            DataResult<TKey,TData> data = new DataResult<>(req.cacheName, req.key, req.data, false);
+            DataResult<TKey,TData> data = new DataResult<>(req.cacheName, req.key, req.data, req.newest, false);
             for (Member m : cluster.state().getMembers()) {
                 if (!cluster.selfAddress().equals(m.address())) {
                     ActorSelection s = context().actorSelection(self().path().toStringWithAddress(m.address()));
