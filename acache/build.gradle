@@ -2,10 +2,10 @@ apply plugin: 'base'
 apply plugin: 'java'
 apply plugin: 'maven'
 
-String mavenVersion = '0.1-SNAPSHOT'
+String mavenVersion = '0.2-SNAPSHOT'
 version = mavenVersion
 
-description = """A Cache"""
+description = """An Cache Actor"""
 String mavenArtifactId = name
 
 dependencies {
@@ -17,4 +17,9 @@ configure(install.repositories.mavenInstaller) {
         artifactId = mavenArtifactId
         version = mavenVersion
     }
+}
+
+repositories {
+    mavenLocal()
+    maven { url "http://repo.maven.apache.org/maven2" }
 }
