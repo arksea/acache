@@ -9,10 +9,6 @@ group = 'net.arksea'
 sourceCompatibility = '1.8'
 targetCompatibility = '1.8'
 
-repositories {
-    mavenLocal()
-    maven { url "http://repo.maven.apache.org/maven2" }
-}
 
 dependencies {
     compile 'com.typesafe.akka:akka-actor_2.11:2.4.8'

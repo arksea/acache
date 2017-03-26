@@ -1,6 +1,7 @@
 package net.arksea.acache;
 
 import akka.actor.ActorRef;
+import akka.actor.ActorSelection;
 import akka.dispatch.Futures;
 import akka.dispatch.Mapper;
 import akka.dispatch.OnComplete;
@@ -37,6 +38,20 @@ public final class CacheAsker {
         this.timeout = timeout;
     }
 
+    public <K,V,R> Future<R> askThenMap(Function<V,R> func,K key,ActorSelection cacheActor) {
+        Future<DataResult<K, V>> future = Patterns.ask(cacheActor, new GetData<K>(key), timeout)
+            .mapTo(classTag((Class<DataResult<K, V>>) (Class<?>) DataResult.class));
+        return future.map(mapper(
+            it -> {
+                if (it.failed == null) {
+                    return func.apply(it.data);
+                } else {
+                    throw new RuntimeException("获取数据失败",it.failed);
+                }
+            }
+        ),dispatcher);
+    }
+
     public <K,V,R> Future<R> askThenMap(Function<V,R> func,K key,ActorRef cacheActor) {
         Future<DataResult<K, V>> future = Patterns.ask(cacheActor, new GetData<K>(key), timeout)
             .mapTo(classTag((Class<DataResult<K, V>>) (Class<?>) DataResult.class));
@@ -49,6 +64,26 @@ public final class CacheAsker {
                 }
             }
         ),dispatcher);
+    }
+
+    public <R,T1,T2> Future<R> askThenMap(Function<Tuple2<T1,T2>,R> function,
+                                          T1 key1,ActorSelection cache1,
+                                          T2 key2,ActorSelection cache2) {
+        Future<DataResult> f1 = CacheActor.ask(cache1, new GetData<>(key1),timeout);
+        Future<DataResult> f2 = CacheActor.ask(cache2, new GetData<>(key2),timeout);
+        List<Future<DataResult>> futures = new ArrayList<>(2);
+        futures.add(f1);
+        futures.add(f2);
+        return ask(futures).map(
+            mapper((List<DataResult> it) -> {
+                for (DataResult d: it) {
+                    if (d.failed != null) {
+                        throw new RuntimeException("获取数据失败", d.failed);
+                    }
+                }
+                Tuple2 tuple = Tuple2.apply(it.get(0).data,it.get(1).data);
+                return function.apply(tuple);
+            }),dispatcher);
     }
 
     public <R,T1,T2> Future<R> askThenMap(Function<Tuple2<T1,T2>,R> function,
@@ -72,6 +107,29 @@ public final class CacheAsker {
     }
 
     public <R,T1,T2,T3> Future<R> askThenMap(Function<Tuple3<T1,T2,T3>,R> function,
+                                             T1 key1,ActorSelection cache1,
+                                             T2 key2,ActorSelection cache2,
+                                             T3 key3,ActorSelection cache3) {
+        Future<DataResult> f1 = CacheActor.ask(cache1, new GetData<>(key1),timeout);
+        Future<DataResult> f2 = CacheActor.ask(cache2, new GetData<>(key2),timeout);
+        Future<DataResult> f3 = CacheActor.ask(cache3, new GetData<>(key3),timeout);
+        List<Future<DataResult>> futures = new ArrayList<>(3);
+        futures.add(f1);
+        futures.add(f2);
+        futures.add(f3);
+        return ask(futures).map(
+            mapper((List<DataResult> it) -> {
+                for (DataResult d: it) {
+                    if (d.failed != null) {
+                        throw new RuntimeException("获取数据失败", d.failed);
+                    }
+                }
+                Tuple3 tuple = Tuple3.apply(it.get(0).data,it.get(1).data,it.get(2).data);
+                return function.apply(tuple);
+            }),dispatcher);
+    }
+
+    public <R,T1,T2,T3> Future<R> askThenMap(Function<Tuple3<T1,T2,T3>,R> function,
                                              T1 key1,ActorRef cache1,
                                              T2 key2,ActorRef cache2,
                                              T3 key3,ActorRef cache3) {
@@ -90,6 +148,32 @@ public final class CacheAsker {
                     }
                 }
                 Tuple3 tuple = Tuple3.apply(it.get(0).data,it.get(1).data,it.get(2).data);
+                return function.apply(tuple);
+            }),dispatcher);
+    }
+
+    public <R,T1,T2,T3,T4> Future<R> askThenMap(Function<Tuple4<T1,T2,T3,T4>,R> function,
+                                                T1 key1,ActorSelection cache1,
+                                                T2 key2,ActorSelection cache2,
+                                                T3 key3,ActorSelection cache3,
+                                                T4 key4,ActorSelection cache4) {
+        Future<DataResult> f1 = CacheActor.ask(cache1, new GetData<>(key1),timeout);
+        Future<DataResult> f2 = CacheActor.ask(cache2, new GetData<>(key2),timeout);
+        Future<DataResult> f3 = CacheActor.ask(cache3, new GetData<>(key3),timeout);
+        Future<DataResult> f4 = CacheActor.ask(cache4, new GetData<>(key4),timeout);
+        List<Future<DataResult>> futures = new ArrayList<>(4);
+        futures.add(f1);
+        futures.add(f2);
+        futures.add(f3);
+        futures.add(f4);
+        return ask(futures).map(
+            mapper((List<DataResult> it) -> {
+                for (DataResult d: it) {
+                    if (d.failed != null) {
+                        throw new RuntimeException("获取数据失败",d.failed);
+                    }
+                }
+                Tuple4 tuple = Tuple4.apply(it.get(0).data,it.get(1).data,it.get(2).data,it.get(3).data);
                 return function.apply(tuple);
             }),dispatcher);
     }
@@ -131,16 +215,36 @@ public final class CacheAsker {
 
     private static class AskData<TKey> {
         final ActorRef cacheActor;
-        final TKey key;
+        final GetData<TKey> get;
 
         AskData(ActorRef cacheActor, TKey key) {
             this.cacheActor = cacheActor;
-            this.key = key;
+            this.get = new GetData(key);
         }
     }
 
     public <K,V> void askThenProcess(K key,ActorRef cacheActor,Consumer<V> onSuccess, Consumer<Throwable> onFailed) {
-        Future<DataResult<K,V>> future = Patterns.ask(cacheActor, new AskData<K>(cacheActor, key), timeout)
+        Future<DataResult<K,V>> future = Patterns.ask(cacheActor, new GetData<K>(key), timeout)
+            .mapTo(classTag((Class<DataResult<K,V>>)(Class<?>)DataResult.class));
+        future.onComplete(
+            new OnComplete<DataResult<K,V>>() {
+                @Override
+                public void onComplete(Throwable ex, DataResult<K,V> dataResult) throws Throwable {
+                    if (ex == null) {
+                        if (dataResult.failed == null) {
+                            onSuccess.accept(dataResult.data);
+                        } else {
+                            onFailed.accept(dataResult.failed);
+                        }
+                    } else {
+                        onFailed.accept(ex);
+                    }
+                }
+            }, dispatcher);
+    }
+
+    public <K,V> void askThenProcess(K key,ActorSelection cacheActor,Consumer<V> onSuccess, Consumer<Throwable> onFailed) {
+        Future<DataResult<K,V>> future = Patterns.ask(cacheActor, new GetData<K>(key), timeout)
             .mapTo(classTag((Class<DataResult<K,V>>)(Class<?>)DataResult.class));
         future.onComplete(
             new OnComplete<DataResult<K,V>>() {
@@ -178,7 +282,7 @@ public final class CacheAsker {
 
     void askThenProcess(Object onSuccess, Consumer<Throwable> onFailed, AskData ...asks) {
         List<Future<DataResult>> futures = Arrays.asList(asks).stream().map(
-            it -> Patterns.ask(it.cacheActor, it, timeout).mapTo(classTag((Class<DataResult>)(Class<?>)DataResult.class))
+            it -> Patterns.ask(it.cacheActor, it.get, timeout).mapTo(classTag((Class<DataResult>)(Class<?>)DataResult.class))
         ).collect(Collectors.toList());
 
         Future<List<DataResult>> future =
