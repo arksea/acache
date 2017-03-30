@@ -1,12 +1,10 @@
 package net.arksea.acache;
 
-import akka.routing.ConsistentHashingRouter;
-
 /**
  *
  * Created by arksea on 2016/11/17.
  */
-public class GetData<TKey> implements ConsistentHashingRouter.ConsistentHashable  {
+public class GetData<TKey> implements ICacheRequest<TKey> {
     public final TKey key;
 
     public GetData(TKey key) {

@@ -11,6 +11,7 @@ import scala.concurrent.Future;
 import scala.concurrent.duration.Duration;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -42,13 +43,13 @@ public class CacheActor<TKey, TData> extends UntypedActor {
         });
     }
 
-    public static Future<DataResult> ask(ActorRef cacheActor, GetData get, long timeout) {
-        return Patterns.ask(cacheActor, get, timeout)
+    public static Future<DataResult> ask(ActorRef cacheActor, ICacheRequest req, long timeout) {
+        return Patterns.ask(cacheActor, req, timeout)
             .mapTo(classTag(DataResult.class));
     }
 
-    public static Future<DataResult> ask(ActorSelection cacheActor, GetData get, long timeout) {
-        return Patterns.ask(cacheActor, get, timeout)
+    public static Future<DataResult> ask(ActorSelection cacheActor, ICacheRequest req, long timeout) {
+        return Patterns.ask(cacheActor, req, timeout)
             .mapTo(classTag(DataResult.class));
     }
 
@@ -74,6 +75,8 @@ public class CacheActor<TKey, TData> extends UntypedActor {
     public void onReceive(Object o) {
         if (o instanceof GetData) {
             handleGetData((GetData<TKey>)o);
+        } else if (o instanceof GetRange) {
+            handleGetRange((GetRange<TKey>) o);
         } else if (o instanceof DataResult) {
             handleDataResult((DataResult<TKey, TData>) o);
         } else if (o instanceof ModifyData) {
@@ -190,6 +193,71 @@ public class CacheActor<TKey, TData> extends UntypedActor {
         };
         future.onFailure(onFailure, context().dispatcher());
     }
+    //-------------------------------------------------------------------------------------
+    protected void handleGetRange(final GetRange<TKey> req) {
+        final String cacheName = self().path().name();
+        final CachedItem<TKey,TData> item = state.cacheMap.get(req.key);
+        if (item == null) { //缓存的初始状态，新建一个CachedItem，从数据源读取数据
+            log.trace("({})缓存未命中，发起更新请求，key={}", cacheName, req.key);
+            requestRange(req);
+        } else if (item.isTimeout(state.config.getLiveTimeout(item.key))) { //数据已过期
+            if (item.isUpdateBackoff()) {
+                log.trace("({})缓存过期，更新请求Backoff中，key={}", cacheName, req.key);
+                sendCachedItemRange(sender(),cacheName, item.getData(), req);
+            } else {
+                log.trace("({})缓存过期，发起更新请求，key={}", cacheName, req.key);
+                item.onRequestUpdate(state.config.getMaxBackoff());
+                requestRange(req);
+            }
+        } else {//数据未过期
+            log.trace("({})命中缓存，key={}，data={}", cacheName, req.key, item.getData());
+            sendCachedItemRange(sender(),cacheName, item.getData(), req);
+        }
+    }
+
+    protected void sendCachedItemRange(ActorRef receiver,String cacheName, TData data, final GetRange<TKey> req) {
+        if (data instanceof List) {
+            List array = (List) data;
+            int size = array.size();
+            int start = req.start;
+            int end = req.count > size-start ? size : start + req.count;
+            List subList = array.subList(req.start,end);
+            ArrayList list = new ArrayList(subList);
+            receiver.tell(new DataResult<>(cacheName, req.key, list), self());
+        } else {
+            Failed failed = new Failed<>(req.key,sender(), new IllegalArgumentException("数据不是List类型"));
+            receiver.tell(failed, self());
+        }
+    }
+
+    protected void requestRange(final GetRange<TKey> req) {
+        try {
+            final Future<TData> future = state.dataSource.request(req.key);
+            onSuccessData(req, future);
+            onFailureData(req.key, future);
+        } catch (Exception ex) {
+            handleFailed(new Failed<>(req.key,sender(),ex));
+        }
+    }
+
+    protected void onSuccessData(final GetRange<TKey> req, final Future<TData> future) {
+        final String cacheName = self().path().name();
+        final ActorRef requester = sender();
+        final OnSuccess<TData> onSuccess = new OnSuccess<TData>() {
+            @Override
+            public void onSuccess(TData data) throws Throwable {
+                if (data == null) {
+                    Failed failed = new Failed<>(req.key,requester, new IllegalArgumentException("("+cacheName+") CacheActor的数据源返回Null"));
+                    self().tell(failed, self());
+                } else {
+                    self().tell(new DataResult<>(cacheName, req.key, data), self()); //给自己的应该是完整的数据
+                    sendCachedItemRange(requester,cacheName, data, req);             //给请求者的则是要求的Range数据
+                }
+            }
+        };
+        future.onSuccess(onSuccess, context().dispatcher());
+    }
+    //-------------------------------------------------------------------------------------
     /**
      * 清除过期缓存
      */

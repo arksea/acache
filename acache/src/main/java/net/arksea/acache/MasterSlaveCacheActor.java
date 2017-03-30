@@ -60,6 +60,23 @@ public class MasterSlaveCacheActor<TKey, TData> extends CacheActor<TKey, TData> 
             handleFailed(new Failed<>(req.key,sender(),ex));
         }
     }
+    @Override
+    protected void requestRange(final GetRange<TKey> req) {
+        try {
+            if (selfIsLeader() || !state.config.updateByMaster()) {
+                final Future<TData> future = state.dataSource.request(req.key);
+                onSuccessData(req, future);
+                onFailureData(req.key, future);
+            } else {
+                Future<DataResult<TKey, TData>> future = Patterns.ask(getLeader(), req, ASK_TIMEOUT)
+                    .mapTo(classTag((Class<DataResult<TKey, TData>>) (Class<?>) DataResult.class));
+                onSuccessResult(future);
+                onFailureResult(req.key, future);
+            }
+        } catch (Exception ex) {
+            handleFailed(new Failed<>(req.key,sender(),ex));
+        }
+    }
     //-------------------------------------------------------------------------------------
     @Override
     protected void handleDataResult(final DataResult<TKey,TData> req) {

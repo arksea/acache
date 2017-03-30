@@ -1,10 +1,12 @@
 package net.arksea.acache;
 
+import java.io.Serializable;
+
 /**
  *
  * Created by arksea on 2016/11/17.
  */
-public class DataResult<TKey,TData> {
+public class DataResult<TKey,TData> implements Serializable {
     public final String cacheName;
     public final TKey key;
     public final TData data;
@@ -16,7 +18,7 @@ public class DataResult<TKey,TData> {
         this.key = key;
         this.data = data;
         this.failed = null;
-        this.sync = false;
+        this.sync = true;
         this.newest = true;
     }
     public DataResult(String cacheName, TKey key, TData data, boolean newest) {
@@ -24,7 +26,7 @@ public class DataResult<TKey,TData> {
         this.key = key;
         this.data = data;
         this.failed = null;
-        this.sync = false;
+        this.sync = true;
         this.newest = newest;
     }
     public DataResult(String cacheName, TKey key, TData data, boolean newest, boolean sync) {
@@ -40,7 +42,7 @@ public class DataResult<TKey,TData> {
         this.key = key;
         this.failed = ex;
         this.data = null;
-        this.sync = false;
+        this.sync = true;
         this.newest = false;
     }
 }

@@ -19,7 +19,34 @@ configure(install.repositories.mavenInstaller) {
     }
 }
 
+//repositories {
+//    mavenLocal()
+//    maven { url "http://repo.maven.apache.org/maven2" }
+//}
+
+
 repositories {
     mavenLocal()
+    maven { url "http://172.17.149.8:8081/nexus/content/groups/public/" }
     maven { url "http://repo.maven.apache.org/maven2" }
+}
+
+uploadArchives {
+    repositories.mavenDeployer {
+        repository(url: "http://172.17.149.8:8081/nexus/content/repositories/releases") {
+            authentication(userName: "admin", password: "admin123")
+        }
+        snapshotRepository(url: "http://172.17.149.8:8081/nexus/content/repositories/snapshots") {
+            authentication(userName: "admin", password: "admin123")
+        }
+    }
+}.dependsOn(assemble)
+
+
+//将更新cache的最大延迟时间改为10分钟（默认为24小时）
+configurations.all {
+    resolutionStrategy {
+        cacheDynamicVersionsFor  30, 'seconds'
+        cacheChangingModulesFor  30, 'seconds'
+    }
 }
