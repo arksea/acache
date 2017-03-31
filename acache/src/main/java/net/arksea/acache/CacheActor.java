@@ -96,11 +96,13 @@ public class CacheActor<TKey, TData> extends UntypedActor {
     }
     //-------------------------------------------------------------------------------------
     protected void handleGetData(final GetData<TKey> req) {
-        final String cacheName = self().path().name();
+        final String cacheName = state.config.getCacheName();
         final CachedItem<TKey,TData> item = state.cacheMap.get(req.key);
         if (item == null) { //缓存的初始状态，新建一个CachedItem，从数据源读取数据
             log.trace("({})缓存未命中，发起更新请求，key={}", cacheName, req.key);
-            requestData(req);
+            DataResult error = new DataResult<>(new IllegalStateException("缓存未命中"), cacheName, req.key);
+            sender().tell(error, self());
+            requestData(req.key);
         } else if (item.isTimeout(state.config.getLiveTimeout(item.key))) { //数据已过期
             if (item.isUpdateBackoff()) {
                 log.trace("({})缓存过期，更新请求Backoff中，key={}", cacheName, req.key);
@@ -108,7 +110,8 @@ public class CacheActor<TKey, TData> extends UntypedActor {
             } else {
                 log.trace("({})缓存过期，发起更新请求，key={}", cacheName, req.key);
                 item.onRequestUpdate(state.config.getMaxBackoff());
-                requestData(req);
+                sender().tell(new DataResult<>(cacheName, req.key, item.getData(), false), getSelf());
+                requestData(req.key);
             }
         } else {//数据未过期
             log.trace("({})命中缓存，key={}，data={}", cacheName, req.key, item.getData());
@@ -116,18 +119,18 @@ public class CacheActor<TKey, TData> extends UntypedActor {
         }
     }
 
-    protected void requestData(final GetData<TKey> req) {
+    protected void requestData(TKey key) {
         try {
-            final Future<TData> future = state.dataSource.request(req.key);
-            onSuccessData(req.key, future);
-            onFailureData(req.key, future);
+            final Future<TData> future = state.dataSource.request(key);
+            onSuccessData(key, future);
+            onFailureData(key, future);
         } catch (Exception ex) {
-            handleFailed(new Failed<>(req.key,sender(),ex));
+            handleFailed(new Failed<>(key,sender(),ex));
         }
     }
     //-------------------------------------------------------------------------------------
     protected void handleDataResult(final DataResult<TKey,TData> req) {
-        final String cacheName = self().path().name();
+        final String cacheName = state.config.getCacheName();
         CachedItem<TKey,TData> item = state.cacheMap.get(req.key);
         if (item == null) {
             log.trace("({})新建缓存，key={}", cacheName, req.key);
@@ -140,7 +143,7 @@ public class CacheActor<TKey, TData> extends UntypedActor {
     }
     //-------------------------------------------------------------------------------------
     protected void handleFailed(final Failed<TKey> failed) {
-        final String cacheName = self().path().name();
+        final String cacheName = state.config.getCacheName();
         final CachedItem item = state.cacheMap.get(failed.key);
         if (item==null) {
             log.warn("({})请求新数据失败；无可用数据，通知请求者已失败，key={}", cacheName, failed.key, failed.error);
@@ -154,18 +157,13 @@ public class CacheActor<TKey, TData> extends UntypedActor {
     }
     //-------------------------------------------------------------------------------------
     protected void handleModifyData(ModifyData<TKey,TData> req) {
-        final String cacheName = self().path().name();
-        try {
-            final Future<TData> future = state.dataSource.modify(req.key, req.modifier);
-            onSuccessData(req.key, future);
-            onFailureData(req.key, future);
-        } catch (Exception ex) {
-            log.warn("({})修改缓存失败；key={}", cacheName, req.key, ex);
-        }
+        final Future<TData> future = state.dataSource.modify(req.key, req.modifier);
+        onSuccessData(req.key, future);
+        onFailureData(req.key, future);
     }
     //-------------------------------------------------------------------------------------
     protected void onSuccessData(final TKey key, final Future<TData> future) {
-        final String cacheName = self().path().name();
+        final String cacheName = state.config.getCacheName();
         final ActorRef requester = sender();
         final OnSuccess<TData> onSuccess = new OnSuccess<TData>() {
             @Override
@@ -175,7 +173,6 @@ public class CacheActor<TKey, TData> extends UntypedActor {
                     self().tell(failed, self());
                 } else {
                     self().tell(new DataResult<>(cacheName, key, data), self());
-                    requester.tell(new DataResult<>(cacheName, key, data), self());
                 }
             }
         };
@@ -195,11 +192,13 @@ public class CacheActor<TKey, TData> extends UntypedActor {
     }
     //-------------------------------------------------------------------------------------
     protected void handleGetRange(final GetRange<TKey> req) {
-        final String cacheName = self().path().name();
+        final String cacheName = state.config.getCacheName();
         final CachedItem<TKey,TData> item = state.cacheMap.get(req.key);
         if (item == null) { //缓存的初始状态，新建一个CachedItem，从数据源读取数据
             log.trace("({})缓存未命中，发起更新请求，key={}", cacheName, req.key);
-            requestRange(req);
+            DataResult error = new DataResult<>(new IllegalStateException("缓存未命中"), cacheName, req.key);
+            sender().tell(error, self());
+            requestData(req.key);
         } else if (item.isTimeout(state.config.getLiveTimeout(item.key))) { //数据已过期
             if (item.isUpdateBackoff()) {
                 log.trace("({})缓存过期，更新请求Backoff中，key={}", cacheName, req.key);
@@ -207,7 +206,8 @@ public class CacheActor<TKey, TData> extends UntypedActor {
             } else {
                 log.trace("({})缓存过期，发起更新请求，key={}", cacheName, req.key);
                 item.onRequestUpdate(state.config.getMaxBackoff());
-                requestRange(req);
+                sendCachedItemRange(sender(),cacheName, item.getData(), req);
+                requestData(req.key);
             }
         } else {//数据未过期
             log.trace("({})命中缓存，key={}，data={}", cacheName, req.key, item.getData());
@@ -221,6 +221,9 @@ public class CacheActor<TKey, TData> extends UntypedActor {
             int size = array.size();
             int start = req.start;
             int end = req.count > size-start ? size : start + req.count;
+            if (start > end) {
+                start = end;
+            }
             List subList = array.subList(req.start,end);
             ArrayList list = new ArrayList(subList);
             receiver.tell(new DataResult<>(cacheName, req.key, list), self());
@@ -228,34 +231,6 @@ public class CacheActor<TKey, TData> extends UntypedActor {
             Failed failed = new Failed<>(req.key,sender(), new IllegalArgumentException("数据不是List类型"));
             receiver.tell(failed, self());
         }
-    }
-
-    protected void requestRange(final GetRange<TKey> req) {
-        try {
-            final Future<TData> future = state.dataSource.request(req.key);
-            onSuccessData(req, future);
-            onFailureData(req.key, future);
-        } catch (Exception ex) {
-            handleFailed(new Failed<>(req.key,sender(),ex));
-        }
-    }
-
-    protected void onSuccessData(final GetRange<TKey> req, final Future<TData> future) {
-        final String cacheName = self().path().name();
-        final ActorRef requester = sender();
-        final OnSuccess<TData> onSuccess = new OnSuccess<TData>() {
-            @Override
-            public void onSuccess(TData data) throws Throwable {
-                if (data == null) {
-                    Failed failed = new Failed<>(req.key,requester, new IllegalArgumentException("("+cacheName+") CacheActor的数据源返回Null"));
-                    self().tell(failed, self());
-                } else {
-                    self().tell(new DataResult<>(cacheName, req.key, data), self()); //给自己的应该是完整的数据
-                    sendCachedItemRange(requester,cacheName, data, req);             //给请求者的则是要求的Range数据
-                }
-            }
-        };
-        future.onSuccess(onSuccess, context().dispatcher());
     }
     //-------------------------------------------------------------------------------------
     /**

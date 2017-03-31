@@ -5,6 +5,7 @@ package net.arksea.acache;
  * Created by arksea on 2016/11/17.
  */
 public interface ICacheConfig<TKey> {
+    String getCacheName();
     /**
      * 缓存闲置时间，单位秒，超过此时间没有访问将被从内存里清除
      * @return
@@ -19,7 +20,6 @@ public interface ICacheConfig<TKey> {
     default long getLiveTimeout(TKey key) {
         return 300000; //默认缓存过期时间5分钟
     }
-
 
     /**
      * 更新数据的最大退避时间
