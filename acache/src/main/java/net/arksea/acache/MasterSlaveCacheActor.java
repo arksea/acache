@@ -44,12 +44,12 @@ public class MasterSlaveCacheActor<TKey, TData> extends CacheActor<TKey, TData> 
     }
     //-------------------------------------------------------------------------------------
     @Override
-    protected void requestData(TKey key) {
+    protected void requestData(TKey key,IResponser responser) {
         try {
             if (selfIsLeader() || !state.config.updateByMaster()) {
                 final Future<TData> future = state.dataSource.request(key);
-                onSuccessData(key, future);
-                onFailureData(key, future);
+                onSuccessData(key, future, responser);
+                onFailureData(key, future, responser);
             } else {
                 Future<DataResult<TKey, TData>> future = Patterns.ask(getLeader(), new GetData(key), ASK_TIMEOUT)
                     .mapTo(classTag((Class<DataResult<TKey, TData>>) (Class<?>) DataResult.class));
@@ -82,10 +82,11 @@ public class MasterSlaveCacheActor<TKey, TData> extends CacheActor<TKey, TData> 
     protected void handleModifyData(ModifyData<TKey,TData> req) {
         final String cacheName = self().path().name();
         try {
+            ModifyDataResponser responser = new ModifyDataResponser(req, sender(), cacheName);
             if (selfIsLeader() || !state.config.updateByMaster()) {
                 final Future<TData> future = state.dataSource.modify(req.key, req.modifier);
-                onSuccessData(req.key, future);
-                onFailureData(req.key, future);
+                onSuccessData(req.key, future, responser);
+                onFailureData(req.key, future, responser);
             } else {
                 Future<DataResult<TKey, TData>> future = Patterns.ask(getLeader(), req, ASK_TIMEOUT)
                     .mapTo(classTag((Class<DataResult<TKey, TData>>) (Class<?>) DataResult.class));
