@@ -66,9 +66,9 @@ public final class CacheAsker {
         ),dispatcher);
     }
 
-    public <R,T1,T2> Future<R> askThenMap(Function<Tuple2<T1,T2>,R> function,
-                                          ICacheRequest<T1> req1,ActorSelection cache1,
-                                          ICacheRequest<T2> req2,ActorSelection cache2) {
+    public <K1,V1,K2,V2,R> Future<R> askThenMap(Function<Tuple2<V1,V2>,R> function,
+                                          ICacheRequest<K1> req1,ActorSelection cache1,
+                                          ICacheRequest<K2> req2,ActorSelection cache2) {
         Future<DataResult> f1 = CacheActor.ask(cache1, req1,timeout);
         Future<DataResult> f2 = CacheActor.ask(cache2, req2,timeout);
         List<Future<DataResult>> futures = new ArrayList<>(2);
@@ -86,9 +86,9 @@ public final class CacheAsker {
             }),dispatcher);
     }
 
-    public <R,T1,T2> Future<R> askThenMap(Function<Tuple2<T1,T2>,R> function,
-                                          ICacheRequest<T1> req1,ActorRef cache1,
-                                          ICacheRequest<T2> req2,ActorRef cache2) {
+    public <K1,V1,K2,V2,R> Future<R> askThenMap(Function<Tuple2<V1,V2>,R> function,
+                                          ICacheRequest<K1> req1,ActorRef cache1,
+                                          ICacheRequest<K2> req2,ActorRef cache2) {
         Future<DataResult> f1 = CacheActor.ask(cache1,req1,timeout);
         Future<DataResult> f2 = CacheActor.ask(cache2,req2,timeout);
         List<Future<DataResult>> futures = new ArrayList<>(2);
@@ -106,10 +106,10 @@ public final class CacheAsker {
             }),dispatcher);
     }
 
-    public <R,T1,T2,T3> Future<R> askThenMap(Function<Tuple3<T1,T2,T3>,R> function,
-                                             ICacheRequest<T1> req1,ActorSelection cache1,
-                                             ICacheRequest<T2> req2,ActorSelection cache2,
-                                             ICacheRequest<T3> req3,ActorSelection cache3) {
+    public <K1,V1,K2,V2,K3,V3,R> Future<R> askThenMap(Function<Tuple3<V1,V2,V3>,R> function,
+                                             ICacheRequest<K1> req1,ActorSelection cache1,
+                                             ICacheRequest<K2> req2,ActorSelection cache2,
+                                             ICacheRequest<K3> req3,ActorSelection cache3) {
         Future<DataResult> f1 = CacheActor.ask(cache1, req1,timeout);
         Future<DataResult> f2 = CacheActor.ask(cache2, req2,timeout);
         Future<DataResult> f3 = CacheActor.ask(cache3, req3,timeout);
@@ -129,10 +129,10 @@ public final class CacheAsker {
             }),dispatcher);
     }
 
-    public <R,T1,T2,T3> Future<R> askThenMap(Function<Tuple3<T1,T2,T3>,R> function,
-                                             ICacheRequest<T1> req1,ActorRef cache1,
-                                             ICacheRequest<T2> req2,ActorRef cache2,
-                                             ICacheRequest<T3> req3,ActorRef cache3) {
+    public <K1,V1,K2,V2,K3,V3,R> Future<R> askThenMap(Function<Tuple3<V1,V2,V3>,R> function,
+                                                      ICacheRequest<K1> req1,ActorRef cache1,
+                                                      ICacheRequest<K2> req2,ActorRef cache2,
+                                                      ICacheRequest<K3> req3,ActorRef cache3) {
         Future<DataResult> f1 = CacheActor.ask(cache1, req1,timeout);
         Future<DataResult> f2 = CacheActor.ask(cache2, req2,timeout);
         Future<DataResult> f3 = CacheActor.ask(cache3, req3,timeout);
@@ -152,11 +152,11 @@ public final class CacheAsker {
             }),dispatcher);
     }
 
-    public <R,T1,T2,T3,T4> Future<R> askThenMap(Function<Tuple4<T1,T2,T3,T4>,R> function,
-                                                ICacheRequest<T1> req1,ActorSelection cache1,
-                                                ICacheRequest<T2> req2,ActorSelection cache2,
-                                                ICacheRequest<T3> req3,ActorSelection cache3,
-                                                ICacheRequest<T4> req4,ActorSelection cache4) {
+    public <K1,V1,K2,V2,K3,V3,K4,V4,R> Future<R> askThenMap(Function<Tuple4<V1,V2,V3,V4>,R> function,
+                                                      ICacheRequest<K1> req1,ActorSelection cache1,
+                                                      ICacheRequest<K2> req2,ActorSelection cache2,
+                                                      ICacheRequest<K3> req3,ActorSelection cache3,
+                                                      ICacheRequest<K4> req4,ActorSelection cache4) {
         Future<DataResult> f1 = CacheActor.ask(cache1,req1,timeout);
         Future<DataResult> f2 = CacheActor.ask(cache2,req2,timeout);
         Future<DataResult> f3 = CacheActor.ask(cache3,req3,timeout);
@@ -178,11 +178,11 @@ public final class CacheAsker {
             }),dispatcher);
     }
 
-    public <R,T1,T2,T3,T4> Future<R> askThenMap(Function<Tuple4<T1,T2,T3,T4>,R> function,
-                                                ICacheRequest<T1> req1,ActorRef cache1,
-                                                ICacheRequest<T2> req2,ActorRef cache2,
-                                                ICacheRequest<T3> req3,ActorRef cache3,
-                                                ICacheRequest<T4> req4,ActorRef cache4) {
+    public <K1,V1,K2,V2,K3,V3,K4,V4,R> Future<R> askThenMap(Function<Tuple4<V1,V2,V3,V4>,R> function,
+                                                            ICacheRequest<K1> req1,ActorRef cache1,
+                                                            ICacheRequest<K2> req2,ActorRef cache2,
+                                                            ICacheRequest<K3> req3,ActorRef cache3,
+                                                            ICacheRequest<K4> req4,ActorRef cache4) {
         Future<DataResult> f1 = CacheActor.ask(cache1, req1,timeout);
         Future<DataResult> f2 = CacheActor.ask(cache2, req2,timeout);
         Future<DataResult> f3 = CacheActor.ask(cache3, req3,timeout);

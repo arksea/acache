@@ -27,7 +27,7 @@ public class CacheActor<TKey, TData> extends UntypedActor {
     private static final Logger log = LogManager.getLogger(CacheActor.class);
     protected final CacheActorState<TKey,TData> state;
     protected final static int ASK_TIMEOUT = 10000;
-    private final DoNothingResponser<TKey> doNothing = new DoNothingResponser<>();
+    //private final DoNothingResponser<TKey> doNothing = new DoNothingResponser<>();
 
     public CacheActor(CacheActorState<TKey,TData> state) {
         this.state = state;
@@ -102,7 +102,6 @@ public class CacheActor<TKey, TData> extends UntypedActor {
         GetDataResponser responser = new GetDataResponser(req, sender(), cacheName);
         if (item == null) { //缓存的初始状态，新建一个CachedItem，从数据源读取数据
             log.trace("({})缓存未命中，发起更新请求，key={}", cacheName, req.key);
-            //DataResult error = new DataResult<>(new IllegalStateException("缓存未命中"), cacheName, req.key);
             requestData(req.key, responser);
         } else if (item.isTimeout(state.config.getLiveTimeout(item.key))) { //数据已过期
             if (item.isUpdateBackoff()) {
@@ -111,8 +110,7 @@ public class CacheActor<TKey, TData> extends UntypedActor {
             } else {
                 log.trace("({})缓存过期，发起更新请求，key={}", cacheName, req.key);
                 item.onRequestUpdate(state.config.getMaxBackoff());
-                responser.send(item.getData(), false, self());
-                requestData(req.key, doNothing);
+                requestData(req.key, responser);
             }
         } else {//数据未过期
             log.trace("({})命中缓存，key={}，data={}", cacheName, req.key, item.getData());
@@ -204,19 +202,15 @@ public class CacheActor<TKey, TData> extends UntypedActor {
         GetRangeResponser responser = new GetRangeResponser(req, sender(), cacheName);
         if (item == null) { //缓存的初始状态，新建一个CachedItem，从数据源读取数据
             log.trace("({})缓存未命中，发起更新请求，key={}", cacheName, req.key);
-            //DataResult error = new DataResult<>(new IllegalStateException("缓存未命中"), cacheName, req.key);
             requestData(req.key, responser);
         } else if (item.isTimeout(state.config.getLiveTimeout(item.key))) { //数据已过期
             if (item.isUpdateBackoff()) {
                 log.trace("({})缓存过期，更新请求Backoff中，key={}", cacheName, req.key);
                 responser.send(item.getData(), false, self());
-                //sendCachedItemRange(sender(),cacheName, item.getData(), req);
             } else {
                 log.trace("({})缓存过期，发起更新请求，key={}", cacheName, req.key);
                 item.onRequestUpdate(state.config.getMaxBackoff());
-                responser.send(item.getData(), false, self());
-                //sendCachedItemRange(sender(),cacheName, item.getData(), req);
-                requestData(req.key, doNothing);
+                requestData(req.key, responser);
             }
         } else {//数据未过期
             log.trace("({})命中缓存，key={}，data={}", cacheName, req.key, item.getData());
