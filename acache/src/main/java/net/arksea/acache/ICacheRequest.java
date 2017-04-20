@@ -7,5 +7,5 @@ import java.io.Serializable;
 /**
  * Created by xiaohaixing_dian91 on 2017/3/30.
  */
-public interface ICacheRequest<TKey> extends ConsistentHashingRouter.ConsistentHashable,Serializable {
+public interface ICacheRequest<TKey,TData> extends ConsistentHashingRouter.ConsistentHashable,Serializable {
 }

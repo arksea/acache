@@ -44,14 +44,9 @@ public class CacheActor<TKey, TData> extends UntypedActor {
         });
     }
 
-    public static Future<DataResult> ask(ActorRef cacheActor, ICacheRequest req, long timeout) {
+    public static <K,V> Future<DataResult<K,V>> ask(ActorSelection cacheActor, ICacheRequest req, long timeout) {
         return Patterns.ask(cacheActor, req, timeout)
-            .mapTo(classTag(DataResult.class));
-    }
-
-    public static Future<DataResult> ask(ActorSelection cacheActor, ICacheRequest req, long timeout) {
-        return Patterns.ask(cacheActor, req, timeout)
-            .mapTo(classTag(DataResult.class));
+            .mapTo(classTag((Class<DataResult<K, V>>) (Class<?>) DataResult.class));
     }
 
     @Override
@@ -75,9 +70,9 @@ public class CacheActor<TKey, TData> extends UntypedActor {
     @SuppressWarnings("unchecked")
     public void onReceive(Object o) {
         if (o instanceof GetData) {
-            handleGetData((GetData<TKey>)o);
+            handleGetData((GetData<TKey,TData>)o);
         } else if (o instanceof GetRange) {
-            handleGetRange((GetRange<TKey>) o);
+            handleGetRange((GetRange<TKey,TData>) o);
         } else if (o instanceof DataResult) {
             handleDataResult((DataResult<TKey, TData>) o);
         } else if (o instanceof ModifyData) {
@@ -96,7 +91,7 @@ public class CacheActor<TKey, TData> extends UntypedActor {
         unhandled(o);
     }
     //-------------------------------------------------------------------------------------
-    protected void handleGetData(final GetData<TKey> req) {
+    protected void handleGetData(final GetData<TKey,TData> req) {
         final String cacheName = state.config.getCacheName();
         final CachedItem<TKey,TData> item = state.cacheMap.get(req.key);
         GetDataResponser responser = new GetDataResponser(req, sender(), cacheName);
@@ -196,7 +191,7 @@ public class CacheActor<TKey, TData> extends UntypedActor {
         future.onFailure(onFailure, context().dispatcher());
     }
     //-------------------------------------------------------------------------------------
-    protected void handleGetRange(final GetRange<TKey> req) {
+    protected void handleGetRange(final GetRange<TKey,TData> req) {
         final String cacheName = state.config.getCacheName();
         final CachedItem<TKey,TData> item = state.cacheMap.get(req.key);
         GetRangeResponser responser = new GetRangeResponser(req, sender(), cacheName);
@@ -219,7 +214,7 @@ public class CacheActor<TKey, TData> extends UntypedActor {
         }
     }
 
-    protected void sendCachedItemRange(ActorRef receiver,String cacheName, TData data, final GetRange<TKey> req) {
+    protected void sendCachedItemRange(ActorRef receiver,String cacheName, TData data, final GetRange<TKey,TData> req) {
         if (data instanceof List) {
             List array = (List) data;
             int size = array.size();

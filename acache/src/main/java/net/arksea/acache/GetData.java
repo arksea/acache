@@ -4,7 +4,7 @@ package net.arksea.acache;
  *
  * Created by arksea on 2016/11/17.
  */
-public class GetData<TKey> implements ICacheRequest<TKey> {
+public class GetData<TKey,TData> implements ICacheRequest<TKey,TData> {
     public final TKey key;
 
     public GetData(TKey key) {
