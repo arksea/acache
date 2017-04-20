@@ -11,7 +11,6 @@ import scala.concurrent.Future;
 import scala.concurrent.duration.Duration;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -27,7 +26,6 @@ public class CacheActor<TKey, TData> extends UntypedActor {
     private static final Logger log = LogManager.getLogger(CacheActor.class);
     protected final CacheActorState<TKey,TData> state;
     protected final static int ASK_TIMEOUT = 10000;
-    //private final DoNothingResponser<TKey> doNothing = new DoNothingResponser<>();
 
     public CacheActor(CacheActorState<TKey,TData> state) {
         this.state = state;
@@ -117,7 +115,7 @@ public class CacheActor<TKey, TData> extends UntypedActor {
         try {
             final Future<TData> future = state.dataSource.request(key);
             onSuccessData(key, future, responser);
-            onFailureData(key, future, responser);
+            onFailureData(key, future);
         } catch (Exception ex) {
             handleFailed(new Failed<>(key,sender(),ex));
         }
@@ -144,7 +142,7 @@ public class CacheActor<TKey, TData> extends UntypedActor {
             DataResult result = new DataResult<>(failed.error, cacheName, failed.key);
             failed.requester.tell(result, self());
         } else {
-            log.warn("({})请求新数据失败；使用旧数据返回请求者，key={}, data={}", cacheName, failed.key, item.getData(), failed.error);
+            log.info("({})请求新数据失败；使用旧数据返回请求者，key={}", cacheName, failed.key, failed.error);
             DataResult result = new DataResult<>(cacheName, failed.key, item.getData(), false);
             failed.requester.tell(result, self());
         }
@@ -155,7 +153,7 @@ public class CacheActor<TKey, TData> extends UntypedActor {
         final Future<TData> future = state.dataSource.modify(req.key, req.modifier);
         ModifyDataResponser responser = new ModifyDataResponser(req, sender(), cacheName);
         onSuccessData(req.key, future, responser);
-        onFailureData(req.key, future, responser);
+        onFailureData(req.key, future);
     }
     //-------------------------------------------------------------------------------------
     protected void onSuccessData(final TKey key, final Future<TData> future, IResponser responser) {
@@ -168,7 +166,6 @@ public class CacheActor<TKey, TData> extends UntypedActor {
                     Exception ex = new IllegalArgumentException("("+cacheName+") CacheActor的数据源返回Null");
                     Failed failed = new Failed<>(key,requester, ex);
                     self().tell(failed, self());
-                    responser.failed(ex, self());
                 } else {
                     self().tell(new DataResult<>(cacheName, key, data), self());
                     responser.send(data, true, self());
@@ -178,14 +175,13 @@ public class CacheActor<TKey, TData> extends UntypedActor {
         future.onSuccess(onSuccess, context().dispatcher());
     }
 
-    protected void onFailureData(final TKey key, final Future<TData> future, IResponser responser) {
+    protected void onFailureData(final TKey key, final Future<TData> future) {
         final ActorRef requester = sender();
         final OnFailure onFailure = new OnFailure(){
             @Override
             public void onFailure(Throwable error) throws Throwable {
                 Failed failed = new Failed<>(key,requester, error);
                 self().tell(failed, self());
-                responser.failed(error, self());
             }
         };
         future.onFailure(onFailure, context().dispatcher());
@@ -210,25 +206,6 @@ public class CacheActor<TKey, TData> extends UntypedActor {
         } else {//数据未过期
             log.trace("({})命中缓存，key={}，data={}", cacheName, req.key, item.getData());
             responser.send(item.getData(), true, self());
-            //sendCachedItemRange(sender(),cacheName, item.getData(), req);
-        }
-    }
-
-    protected void sendCachedItemRange(ActorRef receiver,String cacheName, TData data, final GetRange<TKey,TData> req) {
-        if (data instanceof List) {
-            List array = (List) data;
-            int size = array.size();
-            int start = req.start;
-            int end = req.count > size-start ? size : start + req.count;
-            if (start > end) {
-                start = end;
-            }
-            List subList = array.subList(req.start,end);
-            ArrayList list = new ArrayList(subList);
-            receiver.tell(new DataResult<>(cacheName, req.key, list), self());
-        } else {
-            Failed failed = new Failed<>(req.key,sender(), new IllegalArgumentException("数据不是List类型"));
-            receiver.tell(failed, self());
         }
     }
     //-------------------------------------------------------------------------------------

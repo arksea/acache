@@ -11,9 +11,7 @@ import java.util.List;
  */
 public interface IResponser<TData> {
     default void send(TData data,boolean isNewData,ActorRef sender){}
-    default void failed(Throwable ex,ActorRef sender) {}
 }
-class DoNothingResponser<TData> implements IResponser<TData> {}
 
 class GetDataResponser<TData> implements IResponser<TData> {
     ActorRef receiver;
@@ -26,9 +24,6 @@ class GetDataResponser<TData> implements IResponser<TData> {
     }
     public void send(TData data,boolean isNewData, ActorRef sender) {
         receiver.tell(new DataResult<>(cacheName, get.key, data, isNewData), sender);
-    }
-    public void failed(Throwable ex,ActorRef sender) {
-        receiver.tell(new DataResult<>(ex, cacheName, get.key), sender);
     }
 }
 
@@ -43,9 +38,6 @@ class ModifyDataResponser<TData> implements IResponser<TData> {
     }
     public void send(TData data,boolean isNewData, ActorRef sender) {
         receiver.tell(new DataResult<>(cacheName, req.key, data, isNewData), sender);
-    }
-    public void failed(Throwable ex,ActorRef sender) {
-        receiver.tell(new DataResult<>(ex, cacheName, req.key), sender);
     }
 }
 
@@ -75,8 +67,5 @@ class GetRangeResponser<TData> implements IResponser<TData> {
         } else {
             receiver.tell(new DataResult<>(cacheName, get.key, data, isNewData), sender);
         }
-    }
-    public void failed(Throwable ex,ActorRef sender) {
-        receiver.tell(new DataResult<>(ex, cacheName, get.key), sender);
     }
 }
