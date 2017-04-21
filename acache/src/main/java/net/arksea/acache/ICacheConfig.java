@@ -47,5 +47,13 @@ public interface ICacheConfig<TKey> {
     default boolean autoSync() {
         return false;
     }
+
+    /**
+     * 当数据过期向数据源发起请求时，是否等待数据源返回，如果为false，将先用旧数据返回请求者
+     * 当数据源查询返回需要的时间很短，通常都不会超过请求者设置的超时时间的时候，
+     * 建议设置为true，这样数据过期时可以立即获得从数据源取到的新数据
+     * @return
+     */
+    default boolean waitForRespond() { return false; }
 }
 
