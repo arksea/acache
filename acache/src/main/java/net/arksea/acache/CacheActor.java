@@ -96,21 +96,27 @@ public class CacheActor<TKey, TData> extends UntypedActor {
             log.trace("({})缓存未命中，发起更新请求，key={}", cacheName, req.key);
             requestData(req.key, responser);
         } else if (item.isTimeout(state.config.getLiveTimeout(item.key))) { //数据已过期
-            if (item.isUpdateBackoff()) {
-                log.trace("({})缓存过期，更新请求Backoff中，key={}", cacheName, req.key);
-                responser.send(item.getData(), false, self());
-            } else {
-                log.trace("({})缓存过期，发起更新请求，key={}", cacheName, req.key);
-                item.onRequestUpdate(state.config.getMaxBackoff());
-                if (state.config.waitForRespond()) {
-                    requestData(req.key, responser);
+            if (state.dataSource.isUpdated(item.key, item.getUpdateTime())) {
+                if (item.isUpdateBackoff()) {
+                    log.trace("({})缓存过期，更新请求Backoff中，key={}", cacheName, req.key);
+                    responser.send(item.getData(), false, self());
                 } else {
-                    requestData(req.key, doNothing);
-                    responser.send(item.getData(),false,self());
+                    item.onRequestUpdate(state.config.getMaxBackoff());
+                    if (state.config.waitForRespond()) {
+                        log.trace("({})缓存过期，发起更新请求，key={}", cacheName, req.key);
+                        requestData(req.key, responser);
+                    } else {
+                        log.trace("({})缓存过期，发起更新请求，暂时使用旧数据返回请求者，key={}", cacheName, req.key);
+                        responser.send(item.getData(), false, self());
+                        requestData(req.key, doNothing);
+                    }
                 }
+            } else {
+                log.trace("({})命中缓存，key={}", cacheName, req.key);
+                responser.send(item.getData(), false, self());
             }
         } else {//数据未过期
-            log.trace("({})命中缓存，key={}，data={}", cacheName, req.key, item.getData());
+            log.trace("({})命中缓存，key={}", cacheName, req.key);
             responser.send(item.getData(), true, self());
         }
     }
@@ -133,7 +139,7 @@ public class CacheActor<TKey, TData> extends UntypedActor {
             item = new CachedItem<>(req.key);
             state.cacheMap.put(req.key, item);
         } else {
-            log.trace("({})更新缓存,key={},data={}", cacheName, req.key, req.data);
+            log.trace("({})更新缓存,key={}", cacheName, req.key);
         }
         item.setData(req.data, req.newest);
     }
@@ -195,21 +201,27 @@ public class CacheActor<TKey, TData> extends UntypedActor {
             log.trace("({})缓存未命中，发起更新请求，key={}", cacheName, req.key);
             requestData(req.key, responser);
         } else if (item.isTimeout(state.config.getLiveTimeout(item.key))) { //数据已过期
-            if (item.isUpdateBackoff()) {
-                log.trace("({})缓存过期，更新请求Backoff中，key={}", cacheName, req.key);
-                responser.send(item.getData(), false, self());
-            } else {
-                log.trace("({})缓存过期，发起更新请求，key={}", cacheName, req.key);
-                item.onRequestUpdate(state.config.getMaxBackoff());
-                if (state.config.waitForRespond()) {
-                    requestData(req.key, responser);
-                } else {
-                    requestData(req.key, doNothing);
+            if (state.dataSource.isUpdated(item.key, item.getUpdateTime())) {
+                if (item.isUpdateBackoff()) {
+                    log.trace("({})缓存过期，更新请求Backoff中，key={}", cacheName, req.key);
                     responser.send(item.getData(), false, self());
+                } else {
+                    item.onRequestUpdate(state.config.getMaxBackoff());
+                    if (state.config.waitForRespond()) {
+                        log.trace("({})缓存过期，发起更新请求，key={}", cacheName, req.key);
+                        requestData(req.key, responser);
+                    } else {
+                        log.trace("({})缓存过期，发起更新请求，暂时使用旧数据返回请求者，key={}", cacheName, req.key);
+                        responser.send(item.getData(), false, self());
+                        requestData(req.key, doNothing);
+                    }
                 }
+            } else {
+                log.trace("({})命中缓存，key={}", cacheName, req.key);
+                responser.send(item.getData(), false, self());
             }
         } else {//数据未过期
-            log.trace("({})命中缓存，key={}，data={}", cacheName, req.key, item.getData());
+            log.trace("({})命中缓存，key={}", cacheName, req.key);
             responser.send(item.getData(), true, self());
         }
     }

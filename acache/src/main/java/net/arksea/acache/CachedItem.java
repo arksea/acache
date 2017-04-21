@@ -45,4 +45,7 @@ class CachedItem<TKey, TData> {
         return System.currentTimeMillis() > updateTime + timeout;
     }
 
+    public long getUpdateTime() {
+        return updateTime;
+    }
 }
