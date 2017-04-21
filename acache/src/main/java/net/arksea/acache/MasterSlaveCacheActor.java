@@ -49,7 +49,7 @@ public class MasterSlaveCacheActor<TKey, TData> extends CacheActor<TKey, TData> 
             if (selfIsLeader() || !state.config.updateByMaster()) {
                 final Future<TData> future = state.dataSource.request(key);
                 onSuccessData(key, future, responser);
-                onFailureData(key, future);
+                onFailureData(key, future, responser);
             } else {
                 Future<DataResult<TKey, TData>> future = Patterns.ask(getLeader(), new GetData(key), ASK_TIMEOUT)
                     .mapTo(classTag((Class<DataResult<TKey, TData>>) (Class<?>) DataResult.class));
@@ -86,7 +86,7 @@ public class MasterSlaveCacheActor<TKey, TData> extends CacheActor<TKey, TData> 
             if (selfIsLeader() || !state.config.updateByMaster()) {
                 final Future<TData> future = state.dataSource.modify(req.key, req.modifier);
                 onSuccessData(req.key, future, responser);
-                onFailureData(req.key, future);
+                onFailureData(req.key, future, responser);
             } else {
                 Future<DataResult<TKey, TData>> future = Patterns.ask(getLeader(), req, ASK_TIMEOUT)
                     .mapTo(classTag((Class<DataResult<TKey, TData>>) (Class<?>) DataResult.class));
