@@ -10,39 +10,27 @@ public class DataResult<TKey,TData> implements Serializable {
     public final String cacheName;
     public final TKey key;
     public final TData data;
+    public final long expiredTime;
     public final Throwable failed;
-    public final boolean sync;
-    public final boolean newest; //从数据源取新数据失败，或者正在backoff中，返回的是旧的缓存数据
-    public DataResult(String cacheName, TKey key, TData data) {
+    public DataResult(String cacheName, TKey key, TimedData<TData> timedData) {
         this.cacheName = cacheName;
         this.key = key;
-        this.data = data;
+        this.data = timedData.data;
         this.failed = null;
-        this.sync = true;
-        this.newest = true;
+        this.expiredTime = timedData.time;
     }
-    public DataResult(String cacheName, TKey key, TData data, boolean newest) {
+    public DataResult(String cacheName, TKey key, TData data, long expiredTime) {
         this.cacheName = cacheName;
         this.key = key;
         this.data = data;
         this.failed = null;
-        this.sync = true;
-        this.newest = newest;
-    }
-    public DataResult(String cacheName, TKey key, TData data, boolean newest, boolean sync) {
-        this.cacheName = cacheName;
-        this.key = key;
-        this.data = data;
-        this.failed = null;
-        this.sync = sync;
-        this.newest = newest;
+        this.expiredTime = expiredTime;
     }
     public DataResult(Throwable ex, String cacheName, TKey key) {
         this.cacheName = cacheName;
         this.key = key;
         this.failed = ex;
         this.data = null;
-        this.sync = true;
-        this.newest = false;
+        this.expiredTime = 0;
     }
 }

@@ -65,12 +65,12 @@ public class LocalCacheManager<TKey extends ConsistentHashingRouter.ConsistentHa
         //本地缓存向缓存服务请求数据
         IDataSource localCacheSource = new IDataSource<TKey,TData>() {
             @Override
-            public Future<TData> request(TKey key) {
+            public Future<TimedData<TData>> request(TKey key) {
                 GetData<TKey,TData> get = new GetData<>(key);
                 return cacheServerAsker.ask(get).map(
-                    new Mapper<DataResult<TKey,TData>,TData>() {
-                        public TData apply(DataResult<TKey,TData> dataResult) {
-                            return dataResult.data;
+                    new Mapper<DataResult<TKey,TData>,TimedData<TData>>() {
+                        public TimedData<TData> apply(DataResult<TKey,TData> dataResult) {
+                            return new TimedData<>(dataResult.expiredTime, dataResult.data);
                         }
                     },context().dispatcher()
                 );

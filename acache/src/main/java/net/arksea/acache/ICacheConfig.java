@@ -8,19 +8,12 @@ public interface ICacheConfig<TKey> {
     String getCacheName();
     /**
      * 缓存闲置时间，单位秒，超过此时间没有访问将被从内存里清除
+     * 默认为永不清除
      * @return
      */
     default long getIdleTimeout() {
         return 0;
     };
-    /**
-     * 缓存激活时间，单位秒，超过此时间CacheActor将调用IDataSource接口取新数据
-     * @return
-     */
-    default long getLiveTimeout(TKey key) {
-        return 300000; //默认缓存过期时间5分钟
-    }
-
     /**
      * 更新数据的最大退避时间
      * 每次调用IDataSource.request()接口都将递增退避时间，

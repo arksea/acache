@@ -95,35 +95,30 @@ public class CacheActor<TKey, TData> extends UntypedActor {
         if (item == null) { //缓存的初始状态，新建一个CachedItem，从数据源读取数据
             log.trace("({})缓存未命中，发起更新请求，key={}", cacheName, req.key);
             requestData(req.key, responser);
-        } else if (item.isTimeout(state.config.getLiveTimeout(item.key))) { //数据已过期
-            if (state.dataSource.isUpdated(item.key, item.getUpdateTime())) {
-                if (item.isUpdateBackoff()) {
-                    log.trace("({})缓存过期，更新请求Backoff中，key={}", cacheName, req.key);
-                    responser.send(item.getData(), false, self());
-                } else {
-                    item.onRequestUpdate(state.config.getMaxBackoff());
-                    if (state.config.waitForRespond()) {
-                        log.trace("({})缓存过期，发起更新请求，key={}", cacheName, req.key);
-                        requestData(req.key, responser);
-                    } else {
-                        log.trace("({})缓存过期，发起更新请求，暂时使用旧数据返回请求者，key={}", cacheName, req.key);
-                        responser.send(item.getData(), false, self());
-                        requestData(req.key, doNothing);
-                    }
-                }
+        } else if (item.isExpired()) { //数据已过期
+            if (item.isUpdateBackoff()) {
+                log.trace("({})缓存过期，更新请求Backoff中，key={}", cacheName, req.key);
+                responser.send(item.getData(), self());
             } else {
-                log.trace("({})命中缓存，key={}", cacheName, req.key);
-                responser.send(item.getData(), false, self());
+                item.onRequestUpdate(state.config.getMaxBackoff());
+                if (state.config.waitForRespond()) {
+                    log.trace("({})缓存过期，发起更新请求，key={}", cacheName, req.key);
+                    requestData(req.key, responser);
+                } else {
+                    log.trace("({})缓存过期，发起更新请求，暂时使用旧数据返回请求者，key={}", cacheName, req.key);
+                    responser.send(item.getData(), self());
+                    requestData(req.key, doNothing);
+                }
             }
         } else {//数据未过期
             log.trace("({})命中缓存，key={}", cacheName, req.key);
-            responser.send(item.getData(), true, self());
+            responser.send(item.getData(), self());
         }
     }
 
     protected void requestData(TKey key,IResponser responser) {
         try {
-            final Future<TData> future = state.dataSource.request(key);
+            final Future<TimedData<TData>> future = state.dataSource.request(key);
             onSuccessData(key, future, responser);
             onFailureData(key, future, responser);
         } catch (Exception ex) {
@@ -141,7 +136,7 @@ public class CacheActor<TKey, TData> extends UntypedActor {
         } else {
             log.trace("({})更新缓存,key={}", cacheName, req.key);
         }
-        item.setData(req.data, req.newest);
+        item.setData(req.data, req.expiredTime);
     }
     //-------------------------------------------------------------------------------------
     protected void handleFailed(final Failed<TKey> failed) {
@@ -152,37 +147,37 @@ public class CacheActor<TKey, TData> extends UntypedActor {
             failed.responser.failed(failed.error, self());
         } else {
             log.warn("({})请求新数据失败；使用旧数据返回请求者，key={}", cacheName, failed.key, failed.error);
-            failed.responser.send(item.getData(), false, self());
+            failed.responser.send(item.getData(), self());
         }
     }
     //-------------------------------------------------------------------------------------
     protected void handleModifyData(ModifyData<TKey,TData> req) {
         final String cacheName = state.config.getCacheName();
-        final Future<TData> future = state.dataSource.modify(req.key, req.modifier);
+        final Future<TimedData<TData>> future = state.dataSource.modify(req.key, req.modifier);
         ModifyDataResponser responser = new ModifyDataResponser(req, sender(), cacheName);
         onSuccessData(req.key, future, responser);
         onFailureData(req.key, future, responser);
     }
     //-------------------------------------------------------------------------------------
-    protected void onSuccessData(final TKey key, final Future<TData> future, IResponser responser) {
+    protected void onSuccessData(final TKey key, final Future<TimedData<TData>> future, IResponser responser) {
         final String cacheName = state.config.getCacheName();
-        final OnSuccess<TData> onSuccess = new OnSuccess<TData>() {
+        final OnSuccess<TimedData<TData>> onSuccess = new OnSuccess<TimedData<TData>>() {
             @Override
-            public void onSuccess(TData data) throws Throwable {
-                if (data == null) {
+            public void onSuccess(TimedData<TData> timedData) throws Throwable {
+                if (timedData == null) {
                     Exception ex = new IllegalArgumentException("("+cacheName+") CacheActor的数据源返回Null");
                     Failed failed = new Failed<>(key,responser, ex);
                     self().tell(failed, self());
                 } else {
-                    self().tell(new DataResult<>(cacheName, key, data), self());
-                    responser.send(data, true, self());
+                    self().tell(new DataResult<>(cacheName, key, timedData.data, timedData.time), self());
+                    responser.send(timedData, self());
                 }
             }
         };
         future.onSuccess(onSuccess, context().dispatcher());
     }
 
-    protected void onFailureData(final TKey key, final Future<TData> future, IResponser responser) {
+    protected void onFailureData(final TKey key, final Future<TimedData<TData>> future, IResponser responser) {
         final OnFailure onFailure = new OnFailure(){
             @Override
             public void onFailure(Throwable error) throws Throwable {
@@ -200,29 +195,24 @@ public class CacheActor<TKey, TData> extends UntypedActor {
         if (item == null) { //缓存的初始状态，新建一个CachedItem，从数据源读取数据
             log.trace("({})缓存未命中，发起更新请求，key={}", cacheName, req.key);
             requestData(req.key, responser);
-        } else if (item.isTimeout(state.config.getLiveTimeout(item.key))) { //数据已过期
-            if (state.dataSource.isUpdated(item.key, item.getUpdateTime())) {
-                if (item.isUpdateBackoff()) {
-                    log.trace("({})缓存过期，更新请求Backoff中，key={}", cacheName, req.key);
-                    responser.send(item.getData(), false, self());
-                } else {
-                    item.onRequestUpdate(state.config.getMaxBackoff());
-                    if (state.config.waitForRespond()) {
-                        log.trace("({})缓存过期，发起更新请求，key={}", cacheName, req.key);
-                        requestData(req.key, responser);
-                    } else {
-                        log.trace("({})缓存过期，发起更新请求，暂时使用旧数据返回请求者，key={}", cacheName, req.key);
-                        responser.send(item.getData(), false, self());
-                        requestData(req.key, doNothing);
-                    }
-                }
+        } else if (item.isExpired()) { //数据已过期
+            if (item.isUpdateBackoff()) {
+                log.trace("({})缓存过期，更新请求Backoff中，key={}", cacheName, req.key);
+                responser.send(item.getData(), self());
             } else {
-                log.trace("({})命中缓存，key={}", cacheName, req.key);
-                responser.send(item.getData(), false, self());
+                item.onRequestUpdate(state.config.getMaxBackoff());
+                if (state.config.waitForRespond()) {
+                    log.trace("({})缓存过期，发起更新请求，key={}", cacheName, req.key);
+                    requestData(req.key, responser);
+                } else {
+                    log.trace("({})缓存过期，发起更新请求，暂时使用旧数据返回请求者，key={}", cacheName, req.key);
+                    responser.send(item.getData(), self());
+                    requestData(req.key, doNothing);
+                }
             }
         } else {//数据未过期
             log.trace("({})命中缓存，key={}", cacheName, req.key);
-            responser.send(item.getData(), true, self());
+            responser.send(item.getData(), self());
         }
     }
 
@@ -233,7 +223,7 @@ public class CacheActor<TKey, TData> extends UntypedActor {
     protected void handleCleanTick() {
         final List<CachedItem<TKey,TData>> expired = new LinkedList<>();
         for (CachedItem<TKey,TData> item : state.cacheMap.values()) {
-            if (item.isTimeout(state.config.getIdleTimeout())) {
+            if (item.isExpired()) {
                 expired.add(item);
             }
         }
