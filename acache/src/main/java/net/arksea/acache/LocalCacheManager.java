@@ -70,7 +70,7 @@ public class LocalCacheManager<TKey extends ConsistentHashingRouter.ConsistentHa
                 return cacheServerAsker.ask(get).map(
                     new Mapper<DataResult<TKey,TData>,TimedData<TData>>() {
                         public TimedData<TData> apply(DataResult<TKey,TData> dataResult) {
-                            return new TimedData<>(dataResult.expiredTime, dataResult.data);
+                            return dataResult.timedData;
                         }
                     },context().dispatcher()
                 );

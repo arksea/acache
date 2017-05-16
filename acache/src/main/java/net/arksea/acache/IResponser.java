@@ -70,10 +70,10 @@ class GetRangeResponser<TData> implements IResponser<TData> {
             int end = get.count > size - get.start ? size : get.start + get.count;
             if (get.start > end) {
                 ArrayList list = new ArrayList<>(0);
-                receiver.tell(new DataResult<>(cacheName, get.key, list, timedData.time), sender);
+                receiver.tell(new DataResult<>(cacheName, get.key, new TimedData<>(timedData.time,list)), sender);
             } else {
                 ArrayList list = new ArrayList(array.subList(get.start, end));
-                receiver.tell(new DataResult<>(cacheName, get.key, list, timedData.time), sender);
+                receiver.tell(new DataResult<>(cacheName, get.key, new TimedData<>(timedData.time,list)), sender);
 
             }
         } else {

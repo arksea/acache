@@ -29,14 +29,14 @@ class CachedItem<TKey, TData> {
 //            this.timedData = other;
 //        }
 //    }
-    public void setData(TData other, long expiredTime) {
-        if (expiredTime > this.timedData.time) {
+    public void setData(TimedData other) {
+        if (timedData == null || other.time > this.timedData.time) {
             //只有实效性更长的数据才会清除‘数据过期’的状态，并重置退避时间为最小值
             //这样就会有如下效果：
             //   当返回的数据非新数据，cache就会以退避时间周期性的尝试更新数据：3秒、6秒、12秒...
             //   当返回的数据为新数据，cache就会更新数据时间，重置退避时间周期
             this.retryBackoff = MIN_RETRY_BACKOFF;
-            this.timedData = new TimedData<>(expiredTime,other);
+            this.timedData = other;
         }
     }
 

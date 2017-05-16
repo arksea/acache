@@ -27,11 +27,7 @@ public final class CacheAsker<K,V> {
             new Mapper<DataResult<K,V>,DataResult<K,V>>() {
                 public DataResult<K,V> apply(DataResult<K,V> ret) {
                     if (ret.failed == null) {
-                        if (ret.data == null) {
-                            throw new RuntimeException(ret.cacheName+"返回的数据为null");
-                        } else {
-                            return ret;
-                        }
+                        return ret;
                     } else {
                         throw new RuntimeException(ret.cacheName+"获取数据失败", ret.failed);
                     }
