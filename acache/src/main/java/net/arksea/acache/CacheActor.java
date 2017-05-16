@@ -136,7 +136,7 @@ public class CacheActor<TKey, TData> extends UntypedActor {
         } else {
             log.trace("({})更新缓存,key={}", cacheName, req.key);
         }
-        item.setData(req.timedData);
+        item.setData(req.data,req.expiredTime);
     }
     //-------------------------------------------------------------------------------------
     protected void handleFailed(final Failed<TKey> failed) {
@@ -169,7 +169,7 @@ public class CacheActor<TKey, TData> extends UntypedActor {
                     Failed failed = new Failed<>(key,responser, ex);
                     self().tell(failed, self());
                 } else {
-                    self().tell(new DataResult<>(cacheName, key, timedData), self());
+                    self().tell(new DataResult<>(cacheName, key, timedData.time, timedData.data), self());
                     responser.send(timedData, self());
                 }
             }

@@ -26,7 +26,7 @@ class GetDataResponser<TData> implements IResponser<TData> {
     }
     @Override
     public void send(TimedData<TData> timedData, ActorRef sender) {
-        receiver.tell(new DataResult<>(cacheName, get.key, timedData), sender);
+        receiver.tell(new DataResult<>(cacheName, get.key, timedData.time, timedData.data), sender);
     }
     @Override
     public void failed(Throwable ex,ActorRef sender) {
@@ -45,7 +45,7 @@ class ModifyDataResponser<TData> implements IResponser<TData> {
     }
     @Override
     public void send(TimedData<TData> timedData, ActorRef sender) {
-        receiver.tell(new DataResult<>(cacheName, req.key, timedData), sender);
+        receiver.tell(new DataResult<>(cacheName, req.key, timedData.time, timedData.data), sender);
     }
     @Override
     public void failed(Throwable ex,ActorRef sender) {
@@ -70,14 +70,14 @@ class GetRangeResponser<TData> implements IResponser<TData> {
             int end = get.count > size - get.start ? size : get.start + get.count;
             if (get.start > end) {
                 ArrayList list = new ArrayList<>(0);
-                receiver.tell(new DataResult<>(cacheName, get.key, new TimedData<>(timedData.time,list)), sender);
+                receiver.tell(new DataResult<>(cacheName, get.key, timedData.time,list), sender);
             } else {
                 ArrayList list = new ArrayList(array.subList(get.start, end));
-                receiver.tell(new DataResult<>(cacheName, get.key, new TimedData<>(timedData.time,list)), sender);
+                receiver.tell(new DataResult<>(cacheName, get.key, timedData.time,list), sender);
 
             }
         } else {
-            receiver.tell(new DataResult<>(cacheName, get.key, timedData), sender);
+            receiver.tell(new DataResult<>(cacheName, get.key, timedData.time, timedData.data), sender);
         }
     }
     @Override
