@@ -1,6 +1,5 @@
 package net.arksea.acache;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
