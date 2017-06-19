@@ -9,6 +9,7 @@ class CachedItem<TKey, TData> {
     public final TKey key;    //缓存的Key
     private TimedData<TData> timedData = new TimedData<TData>(0, null);   //缓存的数据
     private long requestUpdateTime;  //请求更新的时间
+    private long lastRequestTime;    //最后一次访问时间
     private long retryBackoff = MIN_RETRY_BACKOFF; //发起更新请求的退避时间
 
     public CachedItem(final TKey key) {
@@ -16,6 +17,7 @@ class CachedItem<TKey, TData> {
     }
 
     public TimedData<TData> getData() {
+        lastRequestTime = System.currentTimeMillis();
         return timedData;
     }
 
@@ -26,6 +28,7 @@ class CachedItem<TKey, TData> {
             //   当返回的数据非新数据，cache就会以退避时间周期性的尝试更新数据：3秒、6秒、12秒...
             //   当返回的数据为新数据，cache就会更新数据时间，重置退避时间周期
             this.retryBackoff = MIN_RETRY_BACKOFF;
+            this.lastRequestTime = System.currentTimeMillis();
             this.timedData = new TimedData<>(expiredTime,other);
         }
     }
@@ -41,6 +44,10 @@ class CachedItem<TKey, TData> {
 
     public boolean isExpired() {
         return System.currentTimeMillis() > timedData.time;
+    }
+
+    public long getLastRequestTime() {
+        return lastRequestTime;
     }
 
 }

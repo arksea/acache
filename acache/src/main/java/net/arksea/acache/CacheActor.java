@@ -48,11 +48,12 @@ public class CacheActor<TKey, TData> extends UntypedActor {
 
     @Override
     public void preStart() {
-        //当IdleTimeout不为零时，启动过期缓存清除定时器
-        long idleTimeout = state.config.getIdleTimeout();
-        long period = Math.max(60000, idleTimeout/10); //清除周期不少于60秒钟，且不多于60分钟
-        period = Math.min(3600000, period);
-        if ( idleTimeout > 0) {
+        //当idleCleanPeriod不为零时，启动过期缓存清除定时器
+        long idleCleanPeriod = state.config.getIdleCleanPeriod();
+        if ( idleCleanPeriod > 0) {
+            //清除周期不少于60秒钟，且不多于60分钟
+            long period = Math.max(60000, idleCleanPeriod);
+            period = Math.min(3600000, period);
             context().system().scheduler().schedule(
                 Duration.create(period, TimeUnit.MILLISECONDS),
                 Duration.create(period, TimeUnit.MILLISECONDS),
@@ -218,18 +219,27 @@ public class CacheActor<TKey, TData> extends UntypedActor {
 
     //-------------------------------------------------------------------------------------
     /**
-     * 清除过期缓存
+     * 清除Idle过期缓存
      */
     protected void handleCleanTick() {
         final List<CachedItem<TKey,TData>> expired = new LinkedList<>();
+        long now = System.currentTimeMillis();
         for (CachedItem<TKey,TData> item : state.cacheMap.values()) {
-            if (item.isExpired()) {
-                expired.add(item);
+            long idleTimeout = state.config.getIdleTimeout(item.key);
+            if (idleTimeout > 0) {
+                //数据闲置的过期时间
+                long idleExpiredTime = item.getLastRequestTime() + idleTimeout;
+                if (now > idleExpiredTime) {
+                    expired.add(item);
+                }
             }
         }
+        log.debug("'{}' has items = {}, to be cleaned items = {}",
+            state.config.getCacheName(), state.cacheMap.size(), expired.size());
         for (CachedItem<TKey,TData> it : expired) {
             state.cacheMap.remove(it.key);
         }
+        expired.clear();
     }
 
     /**
