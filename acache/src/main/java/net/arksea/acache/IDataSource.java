@@ -1,5 +1,6 @@
 package net.arksea.acache;
 
+import akka.actor.ActorRef;
 import scala.concurrent.Future;
 
 /**
@@ -8,7 +9,10 @@ import scala.concurrent.Future;
  */
 public interface IDataSource<TKey, TData> {
     Future<TimedData<TData>> request(TKey key);
-    default Future<TimedData<TData>> modify(TKey key, IDataModifier<TData> modifier) {
-        throw new UnsupportedOperationException();
+    default void preStart(ActorRef cacheActor,String cacheName) {
+        //default donothing
+    }
+    default void afterDirtyMarked(ActorRef cacheActor, String cacheName, EventDirty event) {
+        //default donothing
     }
 }

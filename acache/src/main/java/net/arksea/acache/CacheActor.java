@@ -62,6 +62,7 @@ public class CacheActor<TKey, TData> extends UntypedActor {
                 context().dispatcher(),
                 self());
         }
+        state.dataSource.preStart(self(),state.config.getCacheName());
     }
 
     @Override
@@ -73,8 +74,8 @@ public class CacheActor<TKey, TData> extends UntypedActor {
             handleGetRange((GetRange<TKey,TData>) o);
         } else if (o instanceof DataResult) {
             handleDataResult((DataResult<TKey, TData>) o);
-        } else if (o instanceof ModifyData) {
-            handleModifyData((ModifyData)o);
+        } else if (o instanceof EventDirty) {
+            handleEventDirty((EventDirty)o);
         } else if (o instanceof Failed) {
             handleFailed((Failed<TKey>) o);
         } else if (o instanceof CleanTick) {
@@ -152,12 +153,16 @@ public class CacheActor<TKey, TData> extends UntypedActor {
         }
     }
     //-------------------------------------------------------------------------------------
-    protected void handleModifyData(ModifyData<TKey,TData> req) {
+    protected void handleEventDirty(EventDirty<TKey,TData> event) {
         final String cacheName = state.config.getCacheName();
-        final Future<TimedData<TData>> future = state.dataSource.modify(req.key, req.modifier);
-        ModifyDataResponser responser = new ModifyDataResponser(req, sender(), cacheName);
-        onSuccessData(req.key, future, responser);
-        onFailureData(req.key, future, responser);
+        final CachedItem<TKey,TData> item = state.cacheMap.get(event.key);
+        if (item == null) {
+            log.info("({})标记缓存为脏数据，缓存未命中，key={}", cacheName, event.key);
+        } else {
+            log.info("({})标记缓存为脏数据，key={}", cacheName, event.key);
+            item.markDirty();
+        }
+        state.dataSource.afterDirtyMarked(self(), cacheName, event);
     }
     //-------------------------------------------------------------------------------------
     protected void onSuccessData(final TKey key, final Future<TimedData<TData>> future, IResponser responser) {

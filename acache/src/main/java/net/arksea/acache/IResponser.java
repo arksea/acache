@@ -34,25 +34,6 @@ class GetDataResponser<TData> implements IResponser<TData> {
     }
 }
 
-class ModifyDataResponser<TData> implements IResponser<TData> {
-    ActorRef receiver;
-    String cacheName;
-    ModifyData req;
-    public ModifyDataResponser(ModifyData req,ActorRef receiver,String cacheName) {
-        this.req = req;
-        this.receiver = receiver;
-        this.cacheName = cacheName;
-    }
-    @Override
-    public void send(TimedData<TData> timedData, ActorRef sender) {
-        receiver.tell(new DataResult<>(cacheName, req.key, timedData.time, timedData.data), sender);
-    }
-    @Override
-    public void failed(Throwable ex,ActorRef sender) {
-        receiver.tell(new DataResult<>(ex, cacheName, req.key), sender);
-    }
-}
-
 class GetRangeResponser<TData> implements IResponser<TData> {
     ActorRef receiver;
     String cacheName;

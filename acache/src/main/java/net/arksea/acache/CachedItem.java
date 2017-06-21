@@ -38,6 +38,13 @@ class CachedItem<TKey, TData> {
         this.retryBackoff = Math.min((int) retryBackoff * 2, maxRetryBackoff);
     }
 
+    /**
+     * 标记数据过期时间为0
+     */
+    public void markDirty() {
+        timedData = new TimedData<TData>(0, timedData.data);
+    }
+
     public boolean isUpdateBackoff() {
         return System.currentTimeMillis() < this.requestUpdateTime + retryBackoff;
     }
