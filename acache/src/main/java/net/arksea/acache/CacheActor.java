@@ -15,6 +15,7 @@ import scala.concurrent.duration.Duration;
 import java.io.Serializable;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static akka.japi.Util.classTag;
@@ -56,6 +57,7 @@ public class CacheActor<TKey, TData> extends UntypedActor {
 
     @Override
     public void preStart() {
+        initCache();
         //当idleCleanPeriod不为零时，启动过期缓存清除定时器
         long idleCleanPeriod = state.config.getIdleCleanPeriod();
         if ( idleCleanPeriod > 0) {
@@ -69,6 +71,23 @@ public class CacheActor<TKey, TData> extends UntypedActor {
                 new CleanTick(),
                 context().dispatcher(),
                 self());
+        }
+    }
+
+    private void initCache() {
+        List<TKey> keys = state.config.getInitKeys();
+        if (keys != null && !keys.isEmpty()) {
+            log.info("初始化缓存({})", state.config.getCacheName());
+            Map<TKey, TimedData<TData>> items = state.dataSource.initCache(keys);
+            if (items != null) {
+                for (Map.Entry<TKey, TimedData<TData>> e : items.entrySet()) {
+                    CachedItem<TKey, TData> item = new CachedItem<>(e.getKey());
+                    TimedData<TData> value = e.getValue();
+                    item.setData(value.data, value.time);
+                    state.cacheMap.put(e.getKey(), item);
+                }
+                log.info("初始化缓存({})完成，共加载{}项", state.config.getCacheName(), items.size());
+            }
         }
     }
 

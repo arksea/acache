@@ -1,14 +1,21 @@
 package net.arksea.acache;
 
-import akka.actor.*;
+import akka.actor.ActorRef;
+import akka.actor.ActorRefFactory;
+import akka.actor.ActorSelection;
+import akka.actor.Props;
 import akka.dispatch.Mapper;
 import akka.routing.ConsistentHashingPool;
 import akka.routing.RandomGroup;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import scala.concurrent.Await;
 import scala.concurrent.Future;
+import scala.concurrent.duration.Duration;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 
 /**
@@ -55,6 +62,25 @@ public class LocalCacheCreator {
                         }
                     },actorRefFactory.dispatcher()
                 );
+            }
+
+            public Map<TKey, TimedData<TData>> initCache(List<TKey> keys) {
+                if (keys != null && !keys.isEmpty()) {
+                    Map<TKey, TimedData<TData>> map = new LinkedHashMap<>(keys.size());
+                    for (TKey key : keys) {
+                        Future<TimedData<TData>> f = request(key);
+                        try {
+                            Duration d = Duration.create(timeout,"ms");
+                            TimedData<TData> v = Await.result(f, d);
+                            map.put(key, v);
+                        } catch (Exception ex) {
+                            logger.warn("本地缓存({})加载失败:key={}",localCacheConfig.getCacheName(), key.toString(), ex);
+                        }
+                    }
+                    return map;
+                } else {
+                    return null;
+                }
             }
         };
 
