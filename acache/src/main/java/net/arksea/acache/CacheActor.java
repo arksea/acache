@@ -5,6 +5,8 @@ import akka.dispatch.OnFailure;
 import akka.dispatch.OnSuccess;
 import akka.japi.Creator;
 import akka.pattern.Patterns;
+import akka.routing.ConsistentHashingPool;
+import akka.routing.ConsistentHashingRouter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import scala.concurrent.Future;
@@ -39,6 +41,12 @@ public class CacheActor<TKey, TData> extends UntypedActor {
                 return new CacheActor<>( state);
             }
         });
+    }
+
+    public static <TKey extends ConsistentHashingRouter.ConsistentHashable,TData>
+    Props propsOfCachePool(int poolSize, ICacheConfig<TKey> cacheConfig, IDataSource<TKey,TData> cacheSource) {
+        ConsistentHashingPool pool = new ConsistentHashingPool(poolSize);
+        return pool.props(props(cacheConfig, cacheSource));
     }
 
     public static <K,V> Future<DataResult<K,V>> ask(ActorSelection cacheActor, ICacheRequest req, long timeout) {
