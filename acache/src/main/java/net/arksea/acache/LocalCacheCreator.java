@@ -25,16 +25,16 @@ import java.util.function.Function;
 public class LocalCacheCreator {
     private static final Logger logger = LogManager.getLogger(LocalCacheCreator.class);
 
-    public static <TKey,TData> CacheAsker<TKey,TData> createLocalCache(ActorRefFactory actorRefFactory, ICacheConfig<TKey> localCacheConfig, final List<String> remoteCacheServerPaths, int timeout) {
-        return create(actorRefFactory, localCacheConfig, remoteCacheServerPaths, timeout,
+    public static <TKey,TData> CacheAsker<TKey,TData> createLocalCache(ActorRefFactory actorRefFactory, ICacheConfig<TKey> localCacheConfig, final List<String> remoteCacheServerPaths, int timeout, int initTimeout) {
+        return create(actorRefFactory, localCacheConfig, remoteCacheServerPaths, timeout,initTimeout,
             (IDataSource localCacheSource) -> {
                 return CacheActor.props(localCacheConfig, localCacheSource);
             }
         );
     }
 
-    public static <TKey,TData> CacheAsker<TKey,TData> createPooledLocalCache(ActorRefFactory actorRefFactory, int poolSize, ICacheConfig<TKey> localCacheConfig, final List<String> remoteCacheServerPaths, int timeout) {
-        return create(actorRefFactory, localCacheConfig, remoteCacheServerPaths, timeout,
+    public static <TKey,TData> CacheAsker<TKey,TData> createPooledLocalCache(ActorRefFactory actorRefFactory, int poolSize, ICacheConfig<TKey> localCacheConfig, final List<String> remoteCacheServerPaths, int timeout, int initTimeout) {
+        return create(actorRefFactory, localCacheConfig, remoteCacheServerPaths, timeout,initTimeout,
             (IDataSource localCacheSource) -> {
                 Props props = CacheActor.props(localCacheConfig, localCacheSource);
                 ConsistentHashingPool pool = new ConsistentHashingPool(poolSize);
@@ -43,7 +43,7 @@ public class LocalCacheCreator {
         );
     }
 
-    public static <TKey,TData> CacheAsker<TKey,TData> create(ActorRefFactory actorRefFactory, ICacheConfig<TKey> localCacheConfig, final List<String> remoteCacheServerPaths, int timeout, Function<IDataSource,Props> localCacheProps) {
+    public static <TKey,TData> CacheAsker<TKey,TData> create(ActorRefFactory actorRefFactory, ICacheConfig<TKey> localCacheConfig, final List<String> remoteCacheServerPaths, int timeout, int initTimeout, Function<IDataSource,Props> localCacheProps) {
         Props serverRouterProps = new RandomGroup(remoteCacheServerPaths).props();
         String routerName = localCacheConfig.getCacheName()+"ServerRouter";
         ActorRef serverRouter = actorRefFactory.actorOf(serverRouterProps, routerName);
@@ -65,12 +65,20 @@ public class LocalCacheCreator {
             }
 
             public Map<TKey, TimedData<TData>> initCache(List<TKey> keys) {
+                final CacheAsker<TKey, TData> asker = new CacheAsker<>(serverRouterSel, actorRefFactory.dispatcher(), initTimeout);
                 if (keys != null && !keys.isEmpty()) {
                     Map<TKey, TimedData<TData>> map = new LinkedHashMap<>(keys.size());
                     for (TKey key : keys) {
-                        Future<TimedData<TData>> f = request(key);
                         try {
-                            Duration d = Duration.create(timeout,"ms");
+                            GetData<TKey,TData> get = new GetData<>(key);
+                            Future<TimedData<TData>> f = asker.ask(get).map(
+                                new Mapper<DataResult<TKey,TData>,TimedData<TData>>() {
+                                    public TimedData<TData> apply(DataResult<TKey,TData> dataResult) {
+                                        return new TimedData<>(dataResult.expiredTime, dataResult.data);
+                                    }
+                                },actorRefFactory.dispatcher()
+                            );
+                            Duration d = Duration.create(initTimeout,"ms");
                             TimedData<TData> v = Await.result(f, d);
                             map.put(key, v);
                         } catch (Exception ex) {
