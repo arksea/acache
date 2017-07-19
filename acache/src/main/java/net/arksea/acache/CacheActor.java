@@ -261,8 +261,10 @@ public class CacheActor<TKey, TData> extends UntypedActor {
                 }
             }
         }
-        log.debug("'{}' has items = {}, to be cleaned items = {}",
-            state.config.getCacheName(), state.cacheMap.size(), expired.size());
+        if (expired.size() > 0) {
+            log.info("'{}' has items = {}, to be cleaned items = {}",
+                state.config.getCacheName(), state.cacheMap.size(), expired.size());
+        }
         for (CachedItem<TKey,TData> it : expired) {
             state.cacheMap.remove(it.key);
         }
