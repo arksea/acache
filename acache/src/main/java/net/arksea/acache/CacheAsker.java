@@ -55,12 +55,17 @@ public final class CacheAsker<K,V> {
      * @return
      * @throws Exception
      */
-    public V get(K key) throws Exception {
-        Future<DataResult<K,V>> f = CacheActor.ask(cacheActor, new GetData(key), timeout);
-        Duration d = Duration.create(timeout,"ms");
-        DataResult<K,V> ret = Await.result(f, d);
-        if (ret.failed != null) {
-            throw new Exception("get cache failed", ret.failed);
+    public V get(K key) throws CacheAskException {
+        DataResult<K, V> ret;
+        try {
+            Future<DataResult<K, V>> f = CacheActor.ask(cacheActor, new GetData(key), timeout);
+            Duration d = Duration.create(timeout, "ms");
+            ret = Await.result(f, d);
+        } catch (Exception ex) {
+            throw new CacheAskException("get cache failed", ex);
+        }
+        if (ret!=null && ret.failed != null) {
+            throw new CacheAskException("get cache failed", ret.failed);
         }
         return ret.data;
     }

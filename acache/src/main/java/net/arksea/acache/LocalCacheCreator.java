@@ -44,6 +44,14 @@ public class LocalCacheCreator {
     }
 
     public static <TKey,TData> CacheAsker<TKey,TData> create(ActorRefFactory actorRefFactory, ICacheConfig<TKey> localCacheConfig, final List<String> remoteCacheServerPaths, int timeout, int initTimeout, Function<IDataSource,Props> localCacheProps) {
+        IDataSource localCacheSource = createServerSource(actorRefFactory,localCacheConfig,remoteCacheServerPaths,timeout, initTimeout, localCacheProps);
+        ActorRef localCachePool = actorRefFactory.actorOf(localCacheProps.apply(localCacheSource), localCacheConfig.getCacheName());
+        logger.info("Create PooledLocalCache at：{}",localCachePool.path());
+        ActorSelection sel = actorRefFactory.actorSelection(localCachePool.path());
+        return new CacheAsker<>(sel, actorRefFactory.dispatcher(), timeout);
+    }
+
+    public static <TKey,TData> IDataSource createServerSource(ActorRefFactory actorRefFactory, ICacheConfig<TKey> localCacheConfig, final List<String> remoteCacheServerPaths, int timeout, int initTimeout, Function<IDataSource,Props> localCacheProps) {
         Props serverRouterProps = new RandomGroup(remoteCacheServerPaths).props();
         String routerName = localCacheConfig.getCacheName()+"ServerRouter";
         ActorRef serverRouter = actorRefFactory.actorOf(serverRouterProps, routerName);
@@ -91,10 +99,6 @@ public class LocalCacheCreator {
                 }
             }
         };
-
-        ActorRef localCachePool = actorRefFactory.actorOf(localCacheProps.apply(localCacheSource), localCacheConfig.getCacheName());
-        logger.info("Create PooledLocalCache at：{}",localCachePool.path());
-        ActorSelection sel = actorRefFactory.actorSelection(localCachePool.path());
-        return new CacheAsker<>(sel, actorRefFactory.dispatcher(), timeout);
+        return localCacheSource;
     }
 }
