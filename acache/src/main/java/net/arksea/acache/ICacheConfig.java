@@ -1,5 +1,7 @@
 package net.arksea.acache;
 
+import java.util.List;
+
 /**
  *
  * Created by arksea on 2016/11/17.
@@ -35,5 +37,6 @@ public interface ICacheConfig<TKey> {
      * @return
      */
     default boolean waitForRespond() { return false; }
+    default List<TKey> getInitKeys() { return null; }
 }
 

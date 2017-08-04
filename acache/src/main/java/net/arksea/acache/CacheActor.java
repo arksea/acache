@@ -5,6 +5,8 @@ import akka.dispatch.OnFailure;
 import akka.dispatch.OnSuccess;
 import akka.japi.Creator;
 import akka.pattern.Patterns;
+import akka.routing.ConsistentHashingPool;
+import akka.routing.ConsistentHashingRouter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import scala.concurrent.Future;
@@ -13,6 +15,7 @@ import scala.concurrent.duration.Duration;
 import java.io.Serializable;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static akka.japi.Util.classTag;
@@ -41,6 +44,12 @@ public class CacheActor<TKey, TData> extends UntypedActor {
         });
     }
 
+    public static <TKey extends ConsistentHashingRouter.ConsistentHashable,TData>
+    Props propsOfCachePool(int poolSize, ICacheConfig<TKey> cacheConfig, IDataSource<TKey,TData> cacheSource) {
+        ConsistentHashingPool pool = new ConsistentHashingPool(poolSize);
+        return pool.props(props(cacheConfig, cacheSource));
+    }
+
     public static <K,V> Future<DataResult<K,V>> ask(ActorSelection cacheActor, ICacheRequest req, long timeout) {
         return Patterns.ask(cacheActor, req, timeout)
             .mapTo(classTag((Class<DataResult<K, V>>) (Class<?>) DataResult.class));
@@ -48,6 +57,7 @@ public class CacheActor<TKey, TData> extends UntypedActor {
 
     @Override
     public void preStart() {
+        initCache();
         //当idleCleanPeriod不为零时，启动过期缓存清除定时器
         long idleCleanPeriod = state.config.getIdleCleanPeriod();
         if ( idleCleanPeriod > 0) {
@@ -63,6 +73,23 @@ public class CacheActor<TKey, TData> extends UntypedActor {
                 self());
         }
         state.dataSource.preStart(self(),state.config.getCacheName());
+    }
+
+    private void initCache() {
+        List<TKey> keys = state.config.getInitKeys();
+        if (keys != null && !keys.isEmpty()) {
+            log.info("初始化缓存({})", state.config.getCacheName());
+            Map<TKey, TimedData<TData>> items = state.dataSource.initCache(keys);
+            if (items != null) {
+                for (Map.Entry<TKey, TimedData<TData>> e : items.entrySet()) {
+                    CachedItem<TKey, TData> item = new CachedItem<>(e.getKey());
+                    TimedData<TData> value = e.getValue();
+                    item.setData(value.data, value.time);
+                    state.cacheMap.put(e.getKey(), item);
+                }
+                log.info("初始化缓存({})完成，共加载{}项", state.config.getCacheName(), items.size());
+            }
+        }
     }
 
     @Override
@@ -239,8 +266,10 @@ public class CacheActor<TKey, TData> extends UntypedActor {
                 }
             }
         }
-        log.debug("'{}' has items = {}, to be cleaned items = {}",
-            state.config.getCacheName(), state.cacheMap.size(), expired.size());
+        if (expired.size() > 0) {
+            log.info("'{}' has items = {}, to be cleaned items = {}",
+                state.config.getCacheName(), state.cacheMap.size(), expired.size());
+        }
         for (CachedItem<TKey,TData> it : expired) {
             state.cacheMap.remove(it.key);
         }
