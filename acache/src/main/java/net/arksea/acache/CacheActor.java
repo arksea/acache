@@ -189,16 +189,17 @@ public class CacheActor<TKey, TData> extends UntypedActor {
     //-------------------------------------------------------------------------------------
     protected void onSuccessData(final TKey key, final Future<TimedData<TData>> future, IResponser responser) {
         final String cacheName = state.config.getCacheName();
+        ActorRef cacheActor = self();
         final OnSuccess<TimedData<TData>> onSuccess = new OnSuccess<TimedData<TData>>() {
             @Override
             public void onSuccess(TimedData<TData> timedData) throws Throwable {
                 if (timedData == null) {
                     Exception ex = new IllegalArgumentException("("+cacheName+") CacheActor的数据源返回Null");
                     Failed failed = new Failed<>(key,responser, ex);
-                    self().tell(failed, self());
+                    cacheActor.tell(failed, ActorRef.noSender());
                 } else {
-                    self().tell(new DataResult<>(cacheName, key, timedData.time, timedData.data), self());
-                    responser.send(timedData, self());
+                    cacheActor.tell(new DataResult<>(cacheName, key, timedData.time, timedData.data), ActorRef.noSender());
+                    responser.send(timedData, ActorRef.noSender());
                 }
             }
         };
@@ -206,11 +207,12 @@ public class CacheActor<TKey, TData> extends UntypedActor {
     }
 
     protected void onFailureData(final TKey key, final Future<TimedData<TData>> future, IResponser responser) {
+        ActorRef cacheActor = self();
         final OnFailure onFailure = new OnFailure(){
             @Override
             public void onFailure(Throwable error) throws Throwable {
                 Failed failed = new Failed<>(key,responser, error);
-                self().tell(failed, self());
+                cacheActor.tell(failed, ActorRef.noSender());
             }
         };
         future.onFailure(onFailure, context().dispatcher());
