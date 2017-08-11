@@ -33,6 +33,7 @@ public class LocalCacheCreator {
         );
     }
 
+
     public static <TKey,TData> CacheAsker<TKey,TData> createPooledLocalCache(ActorRefFactory actorRefFactory, int poolSize, ICacheConfig<TKey> localCacheConfig, final List<String> remoteCacheServerPaths, int timeout, int initTimeout) {
         return create(actorRefFactory, localCacheConfig, remoteCacheServerPaths, timeout,initTimeout,
             (IDataSource localCacheSource) -> {
@@ -100,5 +101,67 @@ public class LocalCacheCreator {
             }
         };
         return localCacheSource;
+    }
+
+    public static <TKey,TData> CacheAsker<TKey,TData> createLocalListCache(ActorRefFactory actorRefFactory,
+                                                                           ICacheConfig<TKey> localCacheConfig,
+                                                                           final List<String> remoteCacheServerPaths,
+                                                                           int timeout, int initTimeout) {
+        return create(actorRefFactory, localCacheConfig, remoteCacheServerPaths, timeout,initTimeout,
+            (IDataSource localCacheSource) -> {
+                return ListCacheActor.listCacheProps(localCacheConfig, localCacheSource);
+            }
+        );
+    }
+
+    /**
+     * 为列表类型缓存服务的每个Range创建本地缓存
+     * 对于列表类型的缓存服务，在创建其对应的本地缓存时，如果列表比较长，建议用此方法，创建每个Range的本地缓存
+     * 目的是为了防止在缓存过期时，尝试更新本地缓存的整个列表而造成的数据包过大，也可以避免每次都更新整个列表
+     *
+     * @param actorRefFactory
+     * @param localCacheConfig
+     * @param remoteCacheServerPaths
+     * @param timeout
+     * @param <TKey>
+     * @param <TData>
+     * @return
+     */
+    public static <TKey,TData> CacheAsker<GetRange<TKey>,List> createRangeLocalCache(ActorRefFactory actorRefFactory, ICacheConfig<GetRange<TKey>> localCacheConfig, final List<String> remoteCacheServerPaths, int timeout) {
+        IDataSource localCacheSource = createRangeServerSource(actorRefFactory,localCacheConfig,remoteCacheServerPaths,timeout);
+        ActorRef localCachePool = actorRefFactory.actorOf(CacheActor.props(localCacheConfig, localCacheSource), localCacheConfig.getCacheName());
+        logger.info("Create PooledLocalCache at：{}",localCachePool.path());
+        ActorSelection sel = actorRefFactory.actorSelection(localCachePool.path());
+        return new CacheAsker<>(sel, actorRefFactory.dispatcher(), timeout);
+    }
+
+    public static <TKey,TData> IDataSource<GetRange<TKey>,List> createRangeServerSource(ActorRefFactory actorRefFactory, ICacheConfig<GetRange<TKey>> localCacheConfig, final List<String> remoteCacheServerPaths, int timeout) {
+        Props serverRouterProps = new RandomGroup(remoteCacheServerPaths).props();
+        String routerName = localCacheConfig.getCacheName()+"ServerRouter";
+        ActorRef serverRouter = actorRefFactory.actorOf(serverRouterProps, routerName);
+        logger.debug("Create cache server router at：{}",serverRouter.path());
+        ActorSelection serverRouterSel = actorRefFactory.actorSelection(serverRouter.path());
+        //本地缓存向缓存服务请求数据
+        IDataSource<GetRange<TKey>,List> localCacheSource = new IDataSource<GetRange<TKey>,List>() {
+            @Override
+            public Future<TimedData<List>> request(GetRange key) {
+                return ask(actorRefFactory, serverRouterSel, key, timeout);
+            }
+        };
+        return localCacheSource;
+    }
+
+    public static <K,V> Future<DataResult<K,V>> ask(ActorRefFactory actorRefFactory, ActorSelection cacheActor, ICacheRequest<K,V> req, long timeout) {
+        Future<DataResult<K,V>> f = CacheActor.ask(cacheActor, req, timeout);
+        return f.map(
+            new Mapper<DataResult<K,V>,DataResult<K,V>>() {
+                public DataResult<K,V> apply(DataResult<K,V> ret) {
+                    if (ret.failed == null) {
+                        return ret;
+                    } else {
+                        throw new RuntimeException(ret.cacheName+"获取数据失败", ret.failed);
+                    }
+                }
+            }, actorRefFactory.dispatcher());
     }
 }

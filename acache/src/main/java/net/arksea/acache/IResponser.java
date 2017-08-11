@@ -34,7 +34,7 @@ class GetDataResponser<TData> implements IResponser<TData> {
     }
 }
 
-class GetRangeResponser<TData> implements IResponser<TData> {
+class GetRangeResponser implements IResponser<List> {
     ActorRef receiver;
     String cacheName;
     GetRange get;
@@ -44,21 +44,15 @@ class GetRangeResponser<TData> implements IResponser<TData> {
         this.cacheName = cacheName;
     }
     @Override
-    public void send(TimedData<TData> timedData,ActorRef sender) {
-        if (timedData.data instanceof List) {
-            List array = (List) timedData.data;
-            int size = array.size();
-            int end = get.count > size - get.start ? size : get.start + get.count;
-            if (get.start > end) {
-                ArrayList list = new ArrayList<>(0);
-                receiver.tell(new DataResult<>(cacheName, get.key, timedData.time,list), sender);
-            } else {
-                ArrayList list = new ArrayList(array.subList(get.start, end));
-                receiver.tell(new DataResult<>(cacheName, get.key, timedData.time,list), sender);
-
-            }
+    public void send(TimedData<List> timedData,ActorRef sender) {
+        int size = timedData.data.size();
+        int end = get.count > size - get.start ? size : get.start + get.count;
+        if (get.start > end) {
+            ArrayList list = new ArrayList<>(0);
+            receiver.tell(new DataResult<>(cacheName, get.key, timedData.time,list), sender);
         } else {
-            receiver.tell(new DataResult<>(cacheName, get.key, timedData.time, timedData.data), sender);
+            ArrayList list = new ArrayList(timedData.data.subList(get.start, end));
+            receiver.tell(new DataResult<>(cacheName, get.key, timedData.time,list), sender);
         }
     }
     @Override

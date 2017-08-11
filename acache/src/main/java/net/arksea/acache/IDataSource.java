@@ -23,10 +23,7 @@ public interface IDataSource<TKey, TData> {
     default Map<TKey, TimedData<TData>> initCache(List<TKey> keys) {
         return null;
     }
-    default Future<TimedData<TData>> modify(TKey key, IDataModifier<TData> modifier) {
-        throw new UnsupportedOperationException();
-    }
-    default void afterDirtyMarked(ActorRef cacheActor, String cacheName, EventDirty event) {
+    default void afterDirtyMarked(ActorRef cacheActor, String cacheName, MarkDirty event) {
         //default donothing
     }
 }

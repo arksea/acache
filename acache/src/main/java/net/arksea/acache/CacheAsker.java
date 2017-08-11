@@ -27,10 +27,6 @@ public final class CacheAsker<K,V> {
         return ask(new GetData(key));
     }
 
-    public Future<DataResult<K,V>> askRange(K key, int start, int count) {
-        return ask(new GetRange<K,V>(key, start, count));
-    }
-
     public Future<DataResult<K,V>> ask(ICacheRequest<K,V> req) {
         return ask(req, this.timeout);
     }

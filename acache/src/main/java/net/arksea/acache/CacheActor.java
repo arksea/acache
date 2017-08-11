@@ -25,10 +25,9 @@ import static akka.japi.Util.classTag;
  * Created by arksea on 2016/11/17.
  */
 public class CacheActor<TKey, TData> extends UntypedActor {
-
     private static final Logger log = LogManager.getLogger(CacheActor.class);
     protected final CacheActorState<TKey,TData> state;
-    private final DoNothingResponser<TKey> doNothing = new DoNothingResponser<>();
+    protected final DoNothingResponser<TKey> doNothing = new DoNothingResponser<>();
     public CacheActor(CacheActorState<TKey,TData> state) {
         this.state = state;
     }
@@ -50,6 +49,7 @@ public class CacheActor<TKey, TData> extends UntypedActor {
         return pool.props(props(cacheConfig, cacheSource));
     }
 
+    @SuppressWarnings("unchecked")
     public static <K,V> Future<DataResult<K,V>> ask(ActorSelection cacheActor, ICacheRequest req, long timeout) {
         return Patterns.ask(cacheActor, req, timeout)
             .mapTo(classTag((Class<DataResult<K, V>>) (Class<?>) DataResult.class));
@@ -97,25 +97,19 @@ public class CacheActor<TKey, TData> extends UntypedActor {
     public void onReceive(Object o) {
         if (o instanceof GetData) {
             handleGetData((GetData<TKey,TData>)o);
-        } else if (o instanceof GetRange) {
-            handleGetRange((GetRange<TKey,TData>) o);
         } else if (o instanceof DataResult) {
             handleDataResult((DataResult<TKey, TData>) o);
-        } else if (o instanceof EventDirty) {
-            handleEventDirty((EventDirty)o);
+        } else if (o instanceof MarkDirty) {
+            handleMarkDirty((MarkDirty)o);
         } else if (o instanceof Failed) {
             handleFailed((Failed<TKey>) o);
         } else if (o instanceof CleanTick) {
             handleCleanTick();
         } else {
-            handleOthers(o);
+            unhandled(o);
         }
     }
 
-    @SuppressWarnings("unchecked")
-    protected void handleOthers(Object o) {
-        unhandled(o);
-    }
     //-------------------------------------------------------------------------------------
     private void handleGetData(final GetData<TKey,TData> req) {
         final String cacheName = state.config.getCacheName();
@@ -180,7 +174,7 @@ public class CacheActor<TKey, TData> extends UntypedActor {
         }
     }
     //-------------------------------------------------------------------------------------
-    protected void handleEventDirty(EventDirty<TKey,TData> event) {
+    protected void handleMarkDirty(MarkDirty<TKey,TData> event) {
         final String cacheName = state.config.getCacheName();
         final CachedItem<TKey,TData> item = state.cacheMap.get(event.key);
         if (item == null) {
@@ -222,35 +216,6 @@ public class CacheActor<TKey, TData> extends UntypedActor {
         };
         future.onFailure(onFailure, context().dispatcher());
     }
-    //-------------------------------------------------------------------------------------
-    protected void handleGetRange(final GetRange<TKey,TData> req) {
-        final String cacheName = state.config.getCacheName();
-        final CachedItem<TKey,TData> item = state.cacheMap.get(req.key);
-        GetRangeResponser responser = new GetRangeResponser(req, sender(), cacheName);
-        if (item == null) { //缓存的初始状态，新建一个CachedItem，从数据源读取数据
-            log.trace("({})缓存未命中，发起更新请求，key={}", cacheName, req.key);
-            requestData(req.key, responser);
-        } else if (item.isExpired()) { //数据已过期
-            if (item.isUpdateBackoff()) {
-                log.trace("({})缓存过期，更新请求Backoff中，key={}", cacheName, req.key);
-                responser.send(item.getData(), self());
-            } else {
-                item.onRequestUpdate(state.config.getMaxBackoff());
-                if (state.config.waitForRespond()) {
-                    log.trace("({})缓存过期，发起更新请求，key={}", cacheName, req.key);
-                    requestData(req.key, responser);
-                } else {
-                    log.trace("({})缓存过期，发起更新请求，暂时使用旧数据返回请求者，key={}", cacheName, req.key);
-                    responser.send(item.getData(), self());
-                    requestData(req.key, doNothing);
-                }
-            }
-        } else {//数据未过期
-            log.trace("({})命中缓存，key={}", cacheName, req.key);
-            responser.send(item.getData(), self());
-        }
-    }
-
     //-------------------------------------------------------------------------------------
     /**
      * 清除Idle过期缓存
