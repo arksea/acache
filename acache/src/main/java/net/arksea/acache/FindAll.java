@@ -12,6 +12,10 @@ public class FindAll<K,V,C> implements ICacheRequest<K,V>  {
         this.condition = condition;
     }
 
+    public K getKey() {
+        return key;
+    }
+
     @Override
     public Object consistentHashKey() {
         return key;

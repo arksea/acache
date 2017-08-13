@@ -16,6 +16,10 @@ public class GetRange<TKey> implements ICacheRequest<TKey,List> {
         this.count = count;
     }
 
+    public TKey getKey() {
+        return key;
+    }
+
     @Override
     public Object consistentHashKey() {
         return key;

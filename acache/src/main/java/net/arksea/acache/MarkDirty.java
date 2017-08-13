@@ -10,7 +10,9 @@ public class MarkDirty<TKey,TData> implements ICacheRequest<TKey,TData> {
     public MarkDirty(TKey key) {
         this.key = key;
     }
-
+    public TKey getKey() {
+        return key;
+    }
     @Override
     public Object consistentHashKey() {
         return key;

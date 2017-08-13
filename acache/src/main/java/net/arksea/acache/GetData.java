@@ -7,6 +7,10 @@ package net.arksea.acache;
 public class GetData<TKey,TData> implements ICacheRequest<TKey,TData> {
     public final TKey key;
 
+    public TKey getKey() {
+        return key;
+    }
+
     public GetData(TKey key) {
         this.key = key;
     }

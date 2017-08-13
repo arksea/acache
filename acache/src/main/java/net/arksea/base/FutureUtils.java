@@ -18,7 +18,7 @@ import static akka.japi.Util.classTag;
  */
 public final class FutureUtils {
     private FutureUtils() {}
-    public static <T> void completeFutures(ExecutionContext dispatcher, List<Future<T>> futures, Consumer2<Throwable,Iterable<T>> func) {
+    public static <T> void completeFutures(ExecutionContext dispatcher, Iterable<Future<T>> futures, Consumer2<Throwable,Iterable<T>> func) {
         Futures.sequence(futures,dispatcher).map(
             new Mapper<Iterable<T>, Iterable<T>>() {
                 public Iterable<T> apply(Iterable<T> it) {
@@ -41,7 +41,7 @@ public final class FutureUtils {
         };
     }
 
-    public static <T> Future<List<T>> mapFutures(List<Future<T>> futures, ExecutionContext dispatcher) {
+    public static <T> Future<List<T>> mapFutures(Iterable<Future<T>> futures, ExecutionContext dispatcher) {
         return Futures.sequence(futures,dispatcher).map(
             mapper((Iterable<T> a) -> a),dispatcher
         ).mapTo(classTag((Class<List<T>>)(Class<?>)List.class));

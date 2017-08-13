@@ -113,28 +113,34 @@ public class CacheActor<TKey, TData> extends UntypedActor {
     //-------------------------------------------------------------------------------------
     private void handleGetData(final GetData<TKey,TData> req) {
         final String cacheName = state.config.getCacheName();
-        final CachedItem<TKey,TData> item = state.cacheMap.get(req.key);
         GetDataResponser responser = new GetDataResponser(req, sender(), cacheName);
+        handleRequest(req, responser);
+    }
+
+    protected void handleRequest(final ICacheRequest<TKey,TData> req, IResponser responser) {
+        TKey key = req.getKey();
+        final String cacheName = state.config.getCacheName();
+        final CachedItem<TKey,TData> item = state.cacheMap.get(key);
         if (item == null) { //缓存的初始状态，新建一个CachedItem，从数据源读取数据
-            log.trace("({})缓存未命中，发起更新请求，key={}", cacheName, req.key);
-            requestData(req.key, responser);
+            log.trace("({})缓存未命中，发起更新请求，key={}", cacheName, key);
+            requestData(key, responser);
         } else if (item.isExpired()) { //数据已过期
             if (item.isUpdateBackoff()) {
-                log.trace("({})缓存过期，更新请求Backoff中，key={}", cacheName, req.key);
+                log.trace("({})缓存过期，更新请求Backoff中，key={}", cacheName, key);
                 responser.send(item.getData(), self());
             } else {
                 item.onRequestUpdate(state.config.getMaxBackoff());
                 if (state.config.waitForRespond()) {
-                    log.trace("({})缓存过期，发起更新请求，key={}", cacheName, req.key);
-                    requestData(req.key, responser);
+                    log.trace("({})缓存过期，发起更新请求，key={}", cacheName, key);
+                    requestData(key, responser);
                 } else {
-                    log.trace("({})缓存过期，发起更新请求，暂时使用旧数据返回请求者，key={}", cacheName, req.key);
+                    log.trace("({})缓存过期，发起更新请求，暂时使用旧数据返回请求者，key={}", cacheName, key);
                     responser.send(item.getData(), self());
-                    requestData(req.key, doNothing);
+                    requestData(key, doNothing);
                 }
             }
         } else {//数据未过期
-            log.trace("({})命中缓存，key={}", cacheName, req.key);
+            log.trace("({})命中缓存，key={}", cacheName, key);
             responser.send(item.getData(), self());
         }
     }

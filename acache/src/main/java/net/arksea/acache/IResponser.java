@@ -47,7 +47,7 @@ class GetRangeResponser implements IResponser<List> {
     public void send(TimedData<List> timedData,ActorRef sender) {
         int size = timedData.data.size();
         int end = get.count > size - get.start ? size : get.start + get.count;
-        if (get.start > end) {
+        if (get.start >= end) {
             ArrayList list = new ArrayList<>(0);
             receiver.tell(new DataResult<>(cacheName, get.key, timedData.time,list), sender);
         } else {
@@ -58,5 +58,24 @@ class GetRangeResponser implements IResponser<List> {
     @Override
     public void failed(Throwable ex,ActorRef sender) {
         receiver.tell(new DataResult<>(ex, cacheName, get.key), sender);
+    }
+}
+
+class GetSizeResponser implements IResponser<List> {
+    ActorRef receiver;
+    String cacheName;
+    GetSize get;
+    public GetSizeResponser(GetSize get,ActorRef receiver,String cacheName) {
+        this.get = get;
+        this.receiver = receiver;
+        this.cacheName = cacheName;
+    }
+    @Override
+    public void send(TimedData<List> timedData, ActorRef sender) {
+        receiver.tell(timedData.data.size(), sender);
+    }
+    @Override
+    public void failed(Throwable ex,ActorRef sender) {
+        receiver.tell(-1, sender);
     }
 }
