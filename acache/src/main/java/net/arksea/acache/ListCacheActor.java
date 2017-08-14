@@ -2,8 +2,8 @@ package net.arksea.acache;
 
 import akka.actor.Props;
 import akka.japi.Creator;
-//import org.apache.logging.log4j.LogManager;
-//import org.apache.logging.log4j.Logger;
+import akka.routing.ConsistentHashingPool;
+import akka.routing.ConsistentHashingRouter;
 
 import java.util.List;
 
@@ -11,13 +11,12 @@ import java.util.List;
  * 数据本地缓存
  * Created by arksea on 2016/11/17.
  */
-public class ListCacheActor<TKey> extends CacheActor<TKey,List> {
-//    private static final Logger log = LogManager.getLogger(ListCacheActor.class);
+public class ListCacheActor<TKey> extends AbstractCacheActor<TKey,List> {
     public ListCacheActor(CacheActorState<TKey,List> state) {
         super(state);
     }
 
-    public static <TKey> Props listCacheProps(final ICacheConfig config, final IDataSource<TKey,List> dataRequest) {
+    public static <TKey> Props props(final ICacheConfig config, final IDataSource<TKey,List> dataRequest) {
         return Props.create(ListCacheActor.class, new Creator<ListCacheActor>() {
             CacheActorState<TKey,List> state = new CacheActorState<>(config,dataRequest);
             @Override
@@ -25,6 +24,12 @@ public class ListCacheActor<TKey> extends CacheActor<TKey,List> {
                 return new ListCacheActor<>( state);
             }
         });
+    }
+
+    public static <TKey extends ConsistentHashingRouter.ConsistentHashable>
+    Props propsOfCachePool(int poolSize, ICacheConfig<TKey> cacheConfig, IDataSource<TKey,List> cacheSource) {
+        ConsistentHashingPool pool = new ConsistentHashingPool(poolSize);
+        return pool.props(props(cacheConfig, cacheSource));
     }
 
     @Override
