@@ -4,15 +4,12 @@ import akka.actor.Props;
 import akka.japi.Creator;
 import akka.routing.ConsistentHashingPool;
 import akka.routing.ConsistentHashingRouter;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 /**
  * 数据本地缓存
  * Created by arksea on 2016/11/17.
  */
 public class CacheActor<TKey, TData> extends AbstractCacheActor {
-    private static final Logger log = LogManager.getLogger(CacheActor.class);
 
     public CacheActor(CacheActorState<TKey,TData> state) {
         super(state);
