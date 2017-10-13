@@ -187,9 +187,8 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
             @Override
             public void onSuccess(TimedData<TData> timedData) throws Throwable {
                 if (timedData == null) {
-                    Exception ex = new IllegalArgumentException("("+cacheName+") CacheActor的数据源返回Null");
-                    Failed failed = new Failed<>(key,responser, ex);
-                    cacheActor.tell(failed, ActorRef.noSender());
+                    Exception ex = new IllegalArgumentException(cacheName+"."+key+"没有对应的数据");
+                    responser.failed(ex, ActorRef.noSender());
                 } else {
                     cacheActor.tell(new DataResult<>(cacheName, key, timedData.time, timedData.data), ActorRef.noSender());
                     responser.send(timedData, ActorRef.noSender());
