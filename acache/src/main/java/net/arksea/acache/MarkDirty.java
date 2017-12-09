@@ -1,20 +1,18 @@
 package net.arksea.acache;
 
 /**
- *
- * Created by arksea on 2016/11/17.
+ * 标记脏数据
+ * Created by xiaohaixing on 2017/6/21.
  */
-public class GetData<TKey,TData> implements ICacheRequest<TKey,TData> {
+public class MarkDirty<TKey,TData> implements ICacheRequest<TKey,TData> {
     public final TKey key;
 
+    public MarkDirty(TKey key) {
+        this.key = key;
+    }
     public TKey getKey() {
         return key;
     }
-
-    public GetData(TKey key) {
-        this.key = key;
-    }
-
     @Override
     public Object consistentHashKey() {
         return key;

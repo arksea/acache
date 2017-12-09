@@ -7,10 +7,10 @@ import java.io.Serializable;
  * Created by arksea on 2016/11/17.
  */
 public class DataResult<TKey,TData> implements Serializable {
-    final public TData data;
-    final public long expiredTime;
     public final String cacheName;
     public final TKey key;
+    public final TData data;
+    public final long expiredTime;
     public final Throwable failed;
     public DataResult(String cacheName, TKey key, final long time, final TData data) {
         this.expiredTime = time;

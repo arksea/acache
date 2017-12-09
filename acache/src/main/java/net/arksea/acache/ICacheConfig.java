@@ -1,5 +1,7 @@
 package net.arksea.acache;
 
+import java.util.List;
+
 /**
  *
  * Created by arksea on 2016/11/17.
@@ -7,15 +9,18 @@ package net.arksea.acache;
 public interface ICacheConfig<TKey> {
     String getCacheName();
     /**
-     * 缓存闲置时间，单位秒，超过此时间没有访问将被从内存里清除
+     * 缓存闲置时间，单位毫秒，超过此时间没有访问将被从内存里清除
      * 默认为永不清除
      * @return
      */
-    default long getIdleTimeout() {
+    default long getIdleTimeout(TKey key) {
+        return 0;
+    };
+    default long getIdleCleanPeriod() {
         return 0;
     };
     /**
-     * 更新数据的最大退避时间
+     * 更新数据的最大退避时间，单位毫秒
      * 每次调用IDataSource.request()接口都将递增退避时间，
      * 在退避时间内发起的数据请求将暂时使用过期数据，
      * request调用返回实际的结果后将重置退避时间
@@ -32,5 +37,6 @@ public interface ICacheConfig<TKey> {
      * @return
      */
     default boolean waitForRespond() { return false; }
+    default List<TKey> getInitKeys() { return null; }
 }
 
