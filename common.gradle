@@ -24,23 +24,11 @@ dependencies {
     testCompile 'org.mockito:mockito-core:1.9.5'
 }
 
-//IDE中运行与调试的配置
-
-//配置在IDE中运行及调试时的参数
-task run(type: JavaExec, dependsOn: 'build') {
-    classpath = sourceSets.test.runtimeClasspath + sourceSets.main.runtimeClasspath
-    standardInput = System.in
-    standardOutput = System.out
+repositories {
+    mavenLocal()
+    maven { url "http://172.17.149.8:8081/nexus/content/groups/public/" }
+    maven { url "http://repo.maven.apache.org/maven2" }
 }
-
-task debug(type: JavaExec, dependsOn: 'build') {
-    classpath = sourceSets.test.runtimeClasspath + sourceSets.main.runtimeClasspath
-    standardInput = System.in
-    standardOutput = System.out
-    debug = true
-}
-
-test.testLogging.showStandardStreams = true
 
 pmd {
     toolVersion = '5.1.3'

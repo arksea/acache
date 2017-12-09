@@ -15,7 +15,6 @@ import scala.concurrent.duration.Duration;
  * Created by arksea on 2016/11/17.
  */
 public final class CacheAsker<K,V> {
-
     public final long timeout;
     public final ActorSelection cacheActor;
     public final ExecutionContext dispatcher;
@@ -26,23 +25,23 @@ public final class CacheAsker<K,V> {
         this.dispatcher = dispatcher;
     }
 
-    public Future<DataResult<K,V>> ask(K key) {
+    public Future<CacheResponse<K,V>> ask(K key) {
         return ask(new GetData<>(key));
     }
 
-    public Future<DataResult<K,V>> ask(ICacheRequest<K,V> req) {
+    public Future<CacheResponse<K,V>> ask(CacheRequest<K,V> req) {
         return ask(req, this.timeout);
     }
 
-    public Future<DataResult<K,V>> ask(ICacheRequest<K,V> req, long timeout) {
-        Future<DataResult<K,V>> f = CacheActor.ask(cacheActor, req, timeout);
+    public Future<CacheResponse<K,V>> ask(CacheRequest<K,V> req, long timeout) {
+        Future<CacheResponse<K,V>> f = CacheActor.ask(cacheActor, req, timeout);
         return f.map(
-            new Mapper<DataResult<K,V>,DataResult<K,V>>() {
-                public DataResult<K,V> apply(DataResult<K,V> ret) {
-                    if (ret.failed == null) {
+            new Mapper<CacheResponse<K,V>,CacheResponse<K,V>>() {
+                public CacheResponse<K,V> apply(CacheResponse<K,V> ret) {
+                    if (ret.code == ErrorCodes.SUCCEED) {
                         return ret;
                     } else {
-                        throw new RuntimeException(ret.cacheName+"获取数据失败", ret.failed);
+                        throw new CacheAskException(ret.toString());
                     }
                 }
             }, dispatcher);
@@ -52,19 +51,19 @@ public final class CacheAsker<K,V> {
         return get(new GetData<>(key));
     }
 
-    public Future<V> get(ICacheRequest<K,V> req) {
+    public Future<V> get(CacheRequest<K,V> req) {
         return get(req, this.timeout);
     }
 
-    public Future<V> get(ICacheRequest<K,V> req, long timeout) {
-        Future<DataResult<K,V>> f = CacheActor.ask(cacheActor, req, timeout);
+    public Future<V> get(CacheRequest<K,V> req, long timeout) {
+        Future<CacheResponse<K,V>> f = CacheActor.ask(cacheActor, req, timeout);
         return f.map(
-            new Mapper<DataResult<K,V>,V>() {
-                public V apply(DataResult<K,V> ret) {
-                    if (ret.failed == null) {
-                        return ret.data;
+            new Mapper<CacheResponse<K,V>,V>() {
+                public V apply(CacheResponse<K,V> ret) {
+                    if (ret.code == ErrorCodes.SUCCEED) {
+                        return ret.result;
                     } else {
-                        throw new RuntimeException(ret.cacheName+"获取数据失败", ret.failed);
+                        throw new CacheAskException(ret.toString());
                     }
                 }
             }, dispatcher);
@@ -76,17 +75,17 @@ public final class CacheAsker<K,V> {
      * @throws Exception
      */
     public V syncGet(K key) throws CacheAskException {
-        DataResult<K, V> ret;
+        CacheResponse<K, V> ret;
         try {
-            Future<DataResult<K, V>> f = CacheActor.ask(cacheActor, new GetData(key), timeout);
+            Future<CacheResponse<K, V>> f = CacheActor.ask(cacheActor, new GetData(key), timeout);
             Duration d = Duration.create(timeout, "ms");
             ret = Await.result(f, d);
         } catch (Exception ex) {
             throw new CacheAskException("get cache failed", ex);
         }
-        if (ret!=null && ret.failed != null) {
-            throw new CacheAskException("get cache failed", ret.failed);
+        if (ret!=null && ret.code == ErrorCodes.SUCCEED) {
+            throw new CacheAskException(ret.toString());
         }
-        return ret.data;
+        return ret.result;
     }
 }

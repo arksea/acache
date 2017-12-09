@@ -5,24 +5,14 @@ import java.util.List;
 /**
  * Created by xiaohaixing_dian91 on 2017/3/30.
  */
-public class GetRange<TKey> implements ICacheRequest<TKey,List> {
-    public final TKey key;
+public class GetRange<TKey> extends CacheRequest<TKey,List> {
     public final int start;
     public final int count;
 
     public GetRange(TKey key,int start,int count) {
-        this.key = key;
+        super(key);
         this.start = start;
         this.count = count;
-    }
-
-    public TKey getKey() {
-        return key;
-    }
-
-    @Override
-    public Object consistentHashKey() {
-        return key;
     }
 
     @Override

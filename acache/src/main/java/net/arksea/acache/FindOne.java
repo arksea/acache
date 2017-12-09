@@ -4,21 +4,11 @@ package net.arksea.acache;
  *
  * Created by xiaohaixing on 2017/8/11.
  */
-public class FindOne<K,V,C> implements ICacheRequest<K,V>  {
-    public final K key;
+public class FindOne<K,V,C> extends CacheRequest<K,V> {
     public final C condition;
 
     public FindOne(K key, C condition) {
-        this.key = key;
+        super(key);
         this.condition = condition;
-    }
-
-    public K getKey() {
-        return key;
-    }
-
-    @Override
-    public Object consistentHashKey() {
-        return key;
     }
 }

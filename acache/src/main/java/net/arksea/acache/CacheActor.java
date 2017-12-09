@@ -16,9 +16,9 @@ public class CacheActor<TKey, TData> extends AbstractCacheActor {
     }
 
     //Actor重启时继承原Actor状态与缓存
-    public static <TKey,TData> Props props(final ICacheConfig config, final IDataSource<TKey,TData> dataRequest) {
+    public static <TKey,TData> Props props(final IDataSource<TKey,TData> dataRequest) {
         return Props.create(CacheActor.class, new Creator<CacheActor>() {
-            CacheActorState<TKey,TData> state = new CacheActorState<>(config,dataRequest);
+            CacheActorState<TKey,TData> state = new CacheActorState<>(dataRequest);
             @Override
             public CacheActor<TKey, TData> create() throws Exception {
                 return new CacheActor<>( state);
@@ -27,8 +27,8 @@ public class CacheActor<TKey, TData> extends AbstractCacheActor {
     }
 
     public static <TKey extends ConsistentHashingRouter.ConsistentHashable,TData>
-    Props propsOfCachePool(int poolSize, ICacheConfig<TKey> cacheConfig, IDataSource<TKey,TData> cacheSource) {
+    Props propsOfCachePool(int poolSize, IDataSource<TKey,TData> cacheSource) {
         ConsistentHashingPool pool = new ConsistentHashingPool(poolSize);
-        return pool.props(props(cacheConfig, cacheSource));
+        return pool.props(props(cacheSource));
     }
 }
