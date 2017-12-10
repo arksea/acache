@@ -1,5 +1,7 @@
 package net.arksea.acache;
 
+import java.util.List;
+
 /**
  *
  * Created by arksea on 2016/11/17.
@@ -8,7 +10,7 @@ public interface ICacheConfig<TKey> {
     String getCacheName();
     /**
      * 缓存闲置时间，单位毫秒，超过此时间没有访问将被从内存里清除
-     * 默认为永不清除
+     * 默认为返回0：永不清除
      * @return
      */
     default long getIdleTimeout(TKey key) {
@@ -35,4 +37,13 @@ public interface ICacheConfig<TKey> {
      * @return
      */
     default boolean waitForRespond() { return false; }
+
+    /**
+     * 定义此接口用于缓存级联，作为上级缓存CacheSource向下级缓存获取初始化数据的依据，
+     * 这样上级缓存的实现与封装时无需知道待初始化列表，而推迟到使用此封装时提供
+     * 请参考LocalCacheCreator的实现，使用LocalCache方仅提供CacheConfig接口即可使用预先定义好的CacheSorce实现
+     * （区别于直接的非级联Cache，使用方是需要提供完整的CacheSource实现的）
+     * @return
+     */
+    default List<TKey> getInitKeys() { return null; }
 }

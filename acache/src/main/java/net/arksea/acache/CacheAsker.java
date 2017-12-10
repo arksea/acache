@@ -25,6 +25,11 @@ public final class CacheAsker<K,V> {
         this.dispatcher = dispatcher;
     }
 
+    /**
+     * 直接用key作为参数
+     * @param key
+     * @return
+     */
     public Future<CacheResponse<K,V>> ask(K key) {
         return ask(new GetData<>(key));
     }

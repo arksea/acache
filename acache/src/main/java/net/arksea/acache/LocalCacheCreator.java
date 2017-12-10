@@ -31,42 +31,42 @@ public class LocalCacheCreator {
     private static final Logger logger = LogManager.getLogger(LocalCacheCreator.class);
 
     public static <TKey,TData> CacheAsker<TKey,TData> createLocalCache(ActorRefFactory actorRefFactory,
-                                                                       final String cacheName,
+                                                                       final ICacheConfig config,
                                                                        final List<String> remoteCacheServerPaths,
                                                                        int timeout, int initTimeout) {
-        return createLocalCache(actorRefFactory, cacheName, remoteCacheServerPaths, timeout,initTimeout,
+        return createLocalCache(actorRefFactory, config, remoteCacheServerPaths, timeout,initTimeout,
             (source) -> CacheActor.props(source)
         );
     }
 
     public static <TKey extends ConsistentHashingRouter.ConsistentHashable,TData>
     CacheAsker<TKey,TData> createPooledLocalCache(ActorRefFactory actorRefFactory, int poolSize,
-                                                  final String cacheName,
+                                                  final ICacheConfig config,
                                                   final List<String> remoteCacheServerPaths,
                                                   int timeout, int initTimeout) {
-        return createLocalCache(actorRefFactory, cacheName, remoteCacheServerPaths, timeout,initTimeout,
+        return createLocalCache(actorRefFactory, config, remoteCacheServerPaths, timeout,initTimeout,
             (source) -> CacheActor.propsOfCachePool(poolSize, source)
         );
     }
 
     public static <TKey,TData> CacheAsker<TKey,TData> createLocalCache(ActorRefFactory actorRefFactory,
-                                                                       final String cacheName,
+                                                                       final ICacheConfig config,
                                                                        final List<String> remoteCacheServerPaths,
                                                                        int timeout, int initTimeout,
                                                                        Function<IDataSource,Props> localCacheProps) {
-        IDataSource localCacheSource = createLocalCacheSource(actorRefFactory,cacheName,remoteCacheServerPaths,timeout, initTimeout);
-        ActorRef localCachePool = actorRefFactory.actorOf(localCacheProps.apply(localCacheSource), cacheName);
+        IDataSource localCacheSource = createLocalCacheSource(actorRefFactory,config,remoteCacheServerPaths,timeout, initTimeout);
+        ActorRef localCachePool = actorRefFactory.actorOf(localCacheProps.apply(localCacheSource), config.getCacheName());
         logger.info("Create local cache at：{}",localCachePool.path());
         ActorSelection sel = actorRefFactory.actorSelection(localCachePool.path());
         return new CacheAsker<>(sel, actorRefFactory.dispatcher(), timeout);
     }
 
     private static <TKey,TData> IDataSource createLocalCacheSource(ActorRefFactory actorRefFactory,
-                                                                  String cacheName,
+                                                                   final ICacheConfig config,
                                                                   final List<String> remoteCacheServerPaths,
                                                                   int timeout, int initTimeout) {
         Props serverRouterProps = new RandomGroup(remoteCacheServerPaths).props();
-        String routerName = cacheName+"ServerRouter";
+        String routerName = config.getCacheName()+"ServerRouter";
         ActorRef serverRouter = actorRefFactory.actorOf(serverRouterProps, routerName);
         logger.debug("Create cache server router at：{}",serverRouter.path());
         ActorSelection serverRouterSel = actorRefFactory.actorSelection(serverRouter.path());
@@ -75,14 +75,31 @@ public class LocalCacheCreator {
         IDataSource localCacheSource = new IDataSource<TKey,TData>() {
             @Override
             public String getCacheName() {
-                return cacheName;
+                return config.getCacheName();
             }
-
+            @Override
+            public long getIdleTimeout(TKey key) {
+                return config.getIdleTimeout(key);
+            }
+            @Override
+            public long getIdleCleanPeriod() {
+                return config.getIdleCleanPeriod();
+            }
+            @Override
+            public long getMaxBackoff() {
+                return config.getMaxBackoff();
+            }
+            @Override
+            public boolean waitForRespond() {
+                return config.waitForRespond();
+            }
             @Override
             public Future<TimedData<TData>> request(TKey key) {
                 return request(key, timeout);
             }
-            public Map<TKey, TimedData<TData>> initCache(List<TKey> keys) {
+            @Override
+            public Map<TKey, TimedData<TData>> initCache(ActorRef ref) {
+                List<TKey> keys = config.getInitKeys();
                 if (keys != null && !keys.isEmpty()) {
                     Map<TKey, TimedData<TData>> map = new LinkedHashMap<>(keys.size());
                     for (TKey key : keys) {
@@ -93,7 +110,7 @@ public class LocalCacheCreator {
                             TimedData<TData> v = Await.result(f, d);
                             map.put(key, v);
                         } catch (Exception ex) {
-                            logger.warn("本地缓存({})加载失败:key={}",cacheName, key.toString(), ex);
+                            logger.warn("本地缓存({})加载失败:key={}",config.getCacheName(), key.toString(), ex);
                         }
                     }
                     return map;

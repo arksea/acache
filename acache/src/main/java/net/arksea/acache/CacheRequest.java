@@ -10,6 +10,12 @@ public abstract class CacheRequest<TKey,TData> extends ServiceRequest<TData>
                                                implements ConsistentHashingRouter.ConsistentHashable {
     public final TKey key;
     public CacheRequest(TKey key) {
+        super();
+        this.key = key;
+    }
+
+    public CacheRequest(TKey key, String reqid) {
+        super(reqid);
         this.key = key;
     }
 
