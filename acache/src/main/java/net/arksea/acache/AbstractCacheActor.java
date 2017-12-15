@@ -100,14 +100,8 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
         final String cacheName = state.dataSource.getCacheName();
         final CachedItem<TKey,TData> item = state.cacheMap.get(key);
         if (item == null) { //缓存的初始状态，新建一个CachedItem，从数据源读取数据
-            if (item.isUpdateBackoff()) {
-                log.warn("({})缓存未初始化，更新请求Backoff中，通知请求者已失败，key={}, reqid={}", cacheName, key, req.reqid);
-                responser.failed("更新请求Backoff中", self());
-            } else {
-                item.onRequestUpdate(state.dataSource.getMaxBackoff());
-                log.trace("({})缓存未命中，发起更新请求，key={}, reqid={}", cacheName, key, req.reqid);
-                requestData(req, responser);
-            }
+            log.trace("({})缓存未命中，发起更新请求，key={}, reqid={}", cacheName, key, req.reqid);
+            requestData(req, responser);
         } else if (item.isExpired()) { //数据已过期
             if (item.isUpdateBackoff()) {
                 log.trace("({})缓存过期，更新请求Backoff中，key={}, reqid={}", cacheName, key, req.reqid);
