@@ -18,9 +18,9 @@ public class ListCacheActor<TKey> extends AbstractCacheActor<TKey,List> {
 
     public static <TKey> Props props(final ICacheConfig config, final IDataSource<TKey,List> dataRequest) {
         return Props.create(ListCacheActor.class, new Creator<ListCacheActor>() {
-            CacheActorState<TKey,List> state = new CacheActorState<>(config,dataRequest);
             @Override
             public ListCacheActor<TKey> create() throws Exception {
+                CacheActorState<TKey,List> state = new CacheActorState<>(config,dataRequest);
                 return new ListCacheActor<>( state);
             }
         });

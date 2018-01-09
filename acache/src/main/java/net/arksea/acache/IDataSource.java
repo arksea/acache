@@ -11,6 +11,11 @@ import java.util.Map;
  * Created by arksea on 2016/11/17.
  */
 public interface IDataSource<TKey, TData> {
+    /**
+     *
+     * @param key
+     * @return 返回timeddata=null表示结果不缓存，返回failed给请求方
+     */
     Future<TimedData<TData>> request(TKey key);
     default void preStart(ActorRef cacheActor,String cacheName) {
         //default donothing
