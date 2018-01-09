@@ -115,7 +115,7 @@ public class LocalCacheCreator {
 
     //------------------------------------------------------------------------------------------------------------------
 
-    public static <TKey extends ConsistentHashingRouter.ConsistentHashable>
+    public static <TKey>
     CacheAsker<TKey,List> createLocalListCache(ActorRefFactory actorRefFactory,
                                                ICacheConfig<TKey> localCacheConfig,
                                                final List<String> remoteCacheServerPaths,
