@@ -2,7 +2,7 @@ apply plugin: 'base'
 apply plugin: 'java'
 apply plugin: 'maven'
 
-String mavenVersion = '0.7.2-SNAPSHOT'
+String mavenVersion = '0.7.3-SNAPSHOT'
 version = mavenVersion
 
 description = """An Cache Actor"""
