@@ -15,6 +15,7 @@ import java.io.Serializable;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 import static akka.japi.Util.classTag;
@@ -26,6 +27,7 @@ import static akka.japi.Util.classTag;
 public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
     private static final Logger log = LogManager.getLogger(AbstractCacheActor.class);
     protected final CacheActorState<TKey,TData> state;
+    private static Random random = new Random(System.currentTimeMillis());
     protected final DoNothingResponser<TKey> doNothing = new DoNothingResponser<>();
     public AbstractCacheActor(CacheActorState<TKey,TData> state) {
         this.state = state;
@@ -45,7 +47,7 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
         if ( idleCleanPeriod > 0) {
             //清除周期不少于60秒钟，且不多于60分钟
             long period = Math.max(60000, idleCleanPeriod);
-            period = Math.min(3600000, period);
+            period = Math.min(3600000, period) + random.nextInt(60000); //加随机数为了分散不同实例清除时间，调试日志也比较容易分辨
             context().system().scheduler().schedule(
                 Duration.create(period, TimeUnit.MILLISECONDS),
                 Duration.create(period, TimeUnit.MILLISECONDS),
@@ -210,16 +212,26 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
     protected void handleCleanTick() {
         final List<CachedItem<TKey,TData>> expired = new LinkedList<>();
         long now = System.currentTimeMillis();
+        log.trace("{} cacheMap.size = {}",state.config.getCacheName(),state.cacheMap.size());
         for (CachedItem<TKey,TData> item : state.cacheMap.values()) {
             long idleTimeout = state.config.getIdleTimeout(item.key);
+            log.trace("{} idleTimeout={}",state.config.getCacheName(),idleTimeout);
             if (idleTimeout > 0) {
                 //数据闲置的过期时间
                 long idleExpiredTime = item.getLastRequestTime() + idleTimeout;
+                log.trace("{} idleExpiredTime={}  idleExpiredTime-now={}",state.config.getCacheName(),idleExpiredTime,idleExpiredTime-now);
                 if (now > idleExpiredTime) {
                     expired.add(item);
+                    continue;
                 }
             }
+            //数据被标识为过期移除则删除缓存, 注意：不能调用item.getData().removeOnExpired获取状态
+            //因为getData()会修改lastRequestTime，让item的idle无法过期
+            if (item.isExpired() && item.isRemoveOnExpired()) {
+                expired.add(item);
+            }
         }
+        log.trace("{} expired.size = {}",state.config.getCacheName(),expired.size());
         if (expired.size() > 0) {
             log.info("'{}' has items = {}, to be cleaned items = {}",
                 state.config.getCacheName(), state.cacheMap.size(), expired.size());

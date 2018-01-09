@@ -1,13 +1,17 @@
 package net.arksea.acache;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 /**
  *
  * Created by arksea on 2016/11/17.
  */
 class CachedItem<TKey, TData> {
     private static final int MIN_RETRY_BACKOFF = 3000; //数据采集失败后的最小退避时间（毫秒）
+    private static final Logger logger = LogManager.getLogger(CachedItem.class);
     public final TKey key;    //缓存的Key
-    private TimedData<TData> timedData = new TimedData<TData>(0, null);   //缓存的数据
+    TimedData<TData> timedData = new TimedData<TData>(0, null);   //缓存的数据
     private long requestUpdateTime;  //请求更新的时间
     private long lastRequestTime;    //最后一次访问时间
     private long retryBackoff = MIN_RETRY_BACKOFF; //发起更新请求的退避时间
@@ -21,8 +25,13 @@ class CachedItem<TKey, TData> {
         return timedData;
     }
 
+    public boolean isRemoveOnExpired() {
+        return timedData.removeOnExpired;
+    }
+
     public void setData(TData other, long expiredTime) {
         if (expiredTime > this.timedData.time) {
+            logger.trace("setData(), expiredTime={}",expiredTime);
             //只有实效性更长的数据才会清除‘数据过期’的状态，并重置退避时间为最小值
             //这样就会有如下效果：
             //   当返回的数据非新数据，cache就会以退避时间周期性的尝试更新数据：3秒、6秒、12秒...
