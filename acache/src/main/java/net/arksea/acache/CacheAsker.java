@@ -35,17 +35,7 @@ public final class CacheAsker<K,V> {
     }
 
     public Future<DataResult<K,V>> ask(ICacheRequest<K,V> req, long timeout) {
-        Future<DataResult<K,V>> f = CacheActor.ask(cacheActor, req, timeout);
-        return f.map(
-            new Mapper<DataResult<K,V>,DataResult<K,V>>() {
-                public DataResult<K,V> apply(DataResult<K,V> ret) {
-                    if (ret.failed == null) {
-                        return ret;
-                    } else {
-                        throw new RuntimeException(ret.cacheName+"获取数据失败", ret.failed);
-                    }
-                }
-            }, dispatcher);
+        return CacheActor.ask(cacheActor, req, timeout);
     }
 
     public Future<V> get(K key) {
