@@ -29,7 +29,7 @@ import static akka.japi.Util.classTag;
  */
 public class LocalCacheCreator {
     private static final Logger logger = LogManager.getLogger(LocalCacheCreator.class);
-
+    private static final int LOCAL_ASKER_DELAY = 1000; //asker 需要比source多一些的超时时间用于返回本地数据
     public static <TKey,TData> CacheAsker<TKey,TData> createLocalCache(ActorRefFactory actorRefFactory,
                                                                        ICacheConfig<TKey> localCacheConfig,
                                                                        final List<String> remoteCacheServerPaths,
@@ -58,7 +58,7 @@ public class LocalCacheCreator {
         ActorRef localCachePool = actorRefFactory.actorOf(localCacheProps.apply(localCacheSource), localCacheConfig.getCacheName());
         logger.info("Create local cache at：{}",localCachePool.path());
         ActorSelection sel = actorRefFactory.actorSelection(localCachePool.path());
-        return new CacheAsker<>(sel, actorRefFactory.dispatcher(), timeout);
+        return new CacheAsker<>(sel, actorRefFactory.dispatcher(), timeout+LOCAL_ASKER_DELAY);
     }
 
     private static <TKey,TData> IDataSource createLocalCacheSource(ActorRefFactory actorRefFactory,
@@ -144,7 +144,7 @@ public class LocalCacheCreator {
         ActorRef localCachePool = actorRefFactory.actorOf(localCacheProps.apply(localCacheSource), localCacheConfig.getCacheName());
         logger.info("Create local cache at：{}",localCachePool.path());
         ActorSelection sel = actorRefFactory.actorSelection(localCachePool.path());
-        return new CacheAsker<>(sel, actorRefFactory.dispatcher(), timeout);
+        return new CacheAsker<>(sel, actorRefFactory.dispatcher(), timeout+LOCAL_ASKER_DELAY);
     }
 
     private static <TKey> IDataSource createLocalListCacheSource(ActorRefFactory actorRefFactory,
@@ -248,7 +248,7 @@ public class LocalCacheCreator {
         ActorRef localCachePool = actorRefFactory.actorOf(CacheActor.props(localCacheConfig, localCacheSource), localCacheConfig.getCacheName());
         logger.info("Create PooledLocalCache at：{}",localCachePool.path());
         ActorSelection sel = actorRefFactory.actorSelection(localCachePool.path());
-        return new CacheAsker<>(sel, actorRefFactory.dispatcher(), timeout);
+        return new CacheAsker<>(sel, actorRefFactory.dispatcher(), timeout+LOCAL_ASKER_DELAY);
     }
 
     private static <TKey> IDataSource<GetRange<TKey>,List> createRangeServerSource(ActorRefFactory actorRefFactory, ICacheConfig<GetRange<TKey>> localCacheConfig, final List<String> remoteCacheServerPaths, int timeout) {

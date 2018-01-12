@@ -168,9 +168,9 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
         final String cacheName = state.config.getCacheName();
         final CachedItem<TKey,TData> item = state.cacheMap.get(event.key);
         if (item == null) {
-            log.info("({})标记缓存为脏数据，缓存未命中，key={}", cacheName, event.key);
+            log.debug("({})尝试标记缓存为脏数据，但缓存未命中，key={}", cacheName, event.key);
         } else {
-            log.info("({})标记缓存为脏数据，key={}", cacheName, event.key);
+            log.debug("({})标记缓存为脏数据，key={}", cacheName, event.key);
             item.markDirty();
         }
         state.dataSource.afterDirtyMarked(self(), cacheName, event);
@@ -233,7 +233,7 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
         }
         log.trace("{} expired.size = {}",state.config.getCacheName(),expired.size());
         if (expired.size() > 0) {
-            log.info("'{}' has items = {}, to be cleaned items = {}",
+            log.debug("'{}' has items = {}, to be cleaned items = {}",
                 state.config.getCacheName(), state.cacheMap.size(), expired.size());
         }
         for (CachedItem<TKey,TData> it : expired) {
