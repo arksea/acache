@@ -70,7 +70,7 @@ public class LocalCacheCreator {
         ActorRef serverRouter = actorRefFactory.actorOf(serverRouterProps, routerName);
         logger.debug("Create cache server router at：{}",serverRouter.path());
         ActorSelection serverRouterSel = actorRefFactory.actorSelection(serverRouter.path());
-
+        final CacheAsker<TKey, TData> asker = new CacheAsker<>(serverRouterSel, actorRefFactory.dispatcher(), timeout);
         //本地缓存向缓存服务请求数据
         IDataSource localCacheSource = new IDataSource<TKey,TData>() {
             @Override
@@ -97,13 +97,16 @@ public class LocalCacheCreator {
                 }
             }
             private Future<TimedData<TData>> request(TKey key, long timeout1) {
-                final CacheAsker<TKey, TData> asker = new CacheAsker<>(serverRouterSel, actorRefFactory.dispatcher(), timeout1);
                 GetData<TKey,TData> get = new GetData<>(key);
-                return asker.ask(get).map(
+                return asker.ask(get,timeout1).map(
                     new Mapper<DataResult<TKey, TData>, TimedData<TData>>() {
                         @Override
                         public TimedData<TData> apply(DataResult<TKey, TData> it) {
+                        if (it.failed == null) {
                             return new TimedData<>(it.expiredTime, it.data);
+                        } else {
+                            throw new CacheSourceException("remote cache server error", it.failed);
+                        }
                         }
                     },
                     actorRefFactory.dispatcher()
@@ -156,6 +159,7 @@ public class LocalCacheCreator {
         ActorRef serverRouter = actorRefFactory.actorOf(serverRouterProps, routerName);
         logger.debug("Create cache server router at：{}",serverRouter.path());
         ActorSelection serverRouterSel = actorRefFactory.actorSelection(serverRouter.path());
+        final CacheAsker<TKey, List> cacheServerAsker = new CacheAsker<>(serverRouterSel, actorRefFactory.dispatcher(), timeout);
         //本地缓存向缓存服务请求数据
         IDataSource localCacheSource = new IDataSource<TKey,List>() {
             @Override
@@ -183,7 +187,6 @@ public class LocalCacheCreator {
             private Future<TimedData<List>> request(TKey key, long timeout1) {
                 int COUNT = 20;
                 Duration duration = Duration.create(initTimeout,"ms");
-                final CacheAsker<TKey, List> cacheServerAsker = new CacheAsker<>(serverRouterSel, actorRefFactory.dispatcher(), timeout1);
                 GetSize<TKey> getSize = new GetSize(key);
                 Future<Integer> futureSize = Patterns.ask(serverRouterSel, getSize, timeout1).mapTo(classTag(Integer.class));
                 try {
@@ -192,10 +195,14 @@ public class LocalCacheCreator {
                         List<Future<TimedData<List>>> futures = new LinkedList<>();
                         for (int index = 0; index < size; index+=COUNT) {
                             GetRange<TKey> getRange = new GetRange<>(key, index, COUNT);
-                            Future f = cacheServerAsker.ask(getRange).map(
+                            Future f = cacheServerAsker.ask(getRange,timeout1).map(
                                 new Mapper<DataResult<TKey,List>,TimedData<List>>() {
                                     public TimedData<List> apply(DataResult<TKey,List> dataResult) {
+                                    if (dataResult.failed == null) {
                                         return new TimedData<>(dataResult.expiredTime, dataResult.data);
+                                    } else {
+                                        throw new CacheSourceException("remote cache server error", dataResult.failed);
+                                    }
                                     }
                                 },
                                 actorRefFactory.dispatcher());
@@ -263,7 +270,19 @@ public class LocalCacheCreator {
         IDataSource<GetRange<TKey>,List> localCacheSource = new IDataSource<GetRange<TKey>,List>() {
             @Override
             public Future<TimedData<List>> request(GetRange key) {
-                return asker.ask(key, timeout);
+                return asker.ask(key, timeout).map(
+                    new Mapper<DataResult<TKey, List>, TimedData<List>>() {
+                        @Override
+                        public TimedData<List> apply(DataResult<TKey, List> it) {
+                            if (it.failed == null) {
+                                return new TimedData<>(it.expiredTime, it.data);
+                            } else {
+                                throw new CacheSourceException("remote cache server error", it.failed);
+                            }
+                        }
+                    },
+                    actorRefFactory.dispatcher()
+                );
             }
         };
         return localCacheSource;
