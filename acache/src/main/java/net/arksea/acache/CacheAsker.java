@@ -39,17 +39,7 @@ public final class CacheAsker<K,V> {
     }
 
     public Future<CacheResponse<K,V>> ask(CacheRequest<K,V> req, long timeout) {
-        Future<CacheResponse<K,V>> f = CacheActor.ask(cacheActor, req, timeout);
-        return f.map(
-            new Mapper<CacheResponse<K,V>,CacheResponse<K,V>>() {
-                public CacheResponse<K,V> apply(CacheResponse<K,V> ret) {
-                    if (ret.code == ErrorCodes.SUCCEED) {
-                        return ret;
-                    } else {
-                        throw new CacheAskException(ret.toString());
-                    }
-                }
-            }, dispatcher);
+        return CacheActor.ask(cacheActor, req, timeout);
     }
 
     public Future<V> get(K key) {

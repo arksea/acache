@@ -13,7 +13,7 @@ public interface IDataSource<TKey, TData> extends ICacheConfig<TKey> {
     /**
      *
      * @param key
-     * @return 返回null将被认为所请求的key没有对应的数据，会直接返回错误给请求方，不会作为错误记录日志
+     * @return 返回timeddata=null表示结果不缓存，返回failed给请求方
      */
     Future<TimedData<TData>> request(TKey key);
     /**
