@@ -153,7 +153,7 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
         final CachedItem item = state.cacheMap.get(failed.key);
         if (item==null) {
             log.warn("({})请求新数据失败；无可用数据，通知请求者已失败，key={}, reqid={}", cacheName, failed.key, failed.reqid, failed.error);
-            failed.responser.failed(failed.error.getMessage(), self());
+            failed.responser.failed(ErrorCodes.FAILED, failed.error.getMessage(), self());
         } else {
             log.warn("({})请求新数据失败；使用旧数据返回请求者，key={}, reqid={}", cacheName, failed.key, failed.reqid, failed.error);
             failed.responser.send(item.getData(), self());
@@ -179,7 +179,7 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
             @Override
             public void onSuccess(TimedData<TData> timedData) throws Throwable {
                 if (timedData == null) {
-                    responser.failed(cacheName+"."+req.key+"没有对应的数据", ActorRef.noSender());
+                    responser.failed(ErrorCodes.INVALID_KEY,cacheName+"."+req.key+"没有对应的数据", ActorRef.noSender());
                 } else {
                     cacheActor.tell(new CacheResponse<>(0, "ok", req.reqid, req.key, timedData.data, cacheName, timedData.time), ActorRef.noSender());
                     responser.send(timedData, ActorRef.noSender());

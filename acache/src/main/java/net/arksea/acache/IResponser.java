@@ -11,7 +11,7 @@ import java.util.List;
  */
 public interface IResponser<TData> {
     default void send(TimedData<TData> timedData,ActorRef sender){}
-    default void failed(String error,ActorRef sender) {}
+    default void failed(int code, String error,ActorRef sender) {}
 }
 class DoNothingResponser<TData> implements IResponser<TData> {}
 
@@ -29,8 +29,8 @@ class GetDataResponser<TData> implements IResponser<TData> {
         receiver.tell(new CacheResponse<>(ErrorCodes.SUCCEED, "ok", get.reqid, get.key, timedData.data, cacheName, timedData.time), sender);
     }
     @Override
-    public void failed(String error,ActorRef sender) {
-        receiver.tell(new CacheResponse<>(ErrorCodes.FAILED, error, get.reqid, get.key, cacheName), sender);
+    public void failed(int code, String error,ActorRef sender) {
+        receiver.tell(new CacheResponse<>(code, error, get.reqid, get.key, cacheName), sender);
     }
 }
 
@@ -56,8 +56,8 @@ class GetRangeResponser implements IResponser<List> {
         }
     }
     @Override
-    public void failed(String error,ActorRef sender) {
-        receiver.tell(new CacheResponse<>(ErrorCodes.FAILED, error, get.reqid, get.key, cacheName), sender);
+    public void failed(int code,String error,ActorRef sender) {
+        receiver.tell(new CacheResponse<>(code, error, get.reqid, get.key, cacheName), sender);
     }
 }
 
@@ -75,7 +75,7 @@ class GetSizeResponser implements IResponser<List> {
         receiver.tell(timedData.data.size(), sender);
     }
     @Override
-    public void failed(String error,ActorRef sender) {
+    public void failed(int code, String error,ActorRef sender) {
         receiver.tell(-1, sender);
     }
 }

@@ -128,6 +128,8 @@ public class LocalCacheCreator {
                         public TimedData<TData> apply(CacheResponse<TKey, TData> it) {
                             if (it.code == ErrorCodes.SUCCEED) {
                                 return new TimedData<>(it.expiredTime, it.result);
+                            } else if (it.code == ErrorCodes.INVALID_KEY) {
+                                return null;
                             } else {
                                 throw new CacheAskException("remote cache server error: "+it.code+","+it.msg);
                             }
@@ -228,6 +230,8 @@ public class LocalCacheCreator {
                                     public TimedData<List> apply(CacheResponse<TKey,List> dataResult) {
                                         if (dataResult.code == ErrorCodes.SUCCEED) {
                                             return new TimedData<>(dataResult.expiredTime, dataResult.result);
+                                        } else if(dataResult.code == ErrorCodes.INVALID_KEY) {
+                                            return null;
                                         } else {
                                             throw new CacheAskException("remote cache server error: "+dataResult.code+","+dataResult.msg);
                                         }
@@ -309,6 +313,8 @@ public class LocalCacheCreator {
                         public TimedData<List> apply(CacheResponse<TKey, List> it) {
                             if (it.code == ErrorCodes.SUCCEED) {
                                 return new TimedData<>(it.expiredTime, it.result);
+                            } else if (it.code == ErrorCodes.INVALID_KEY) {
+                                return null;
                             } else {
                                 throw new CacheAskException("remote cache server error: "+it.code+","+it.msg);
                             }
