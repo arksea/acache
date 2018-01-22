@@ -19,6 +19,18 @@ public interface ICacheConfig<TKey> {
     default long getIdleCleanPeriod() {
         return 0;
     };
+
+    /**
+     * 缓存过期是否自动更新
+     * @param key
+     * @return
+     */
+    default boolean isAutoUpdateExpiredData(TKey key) {
+        return false;
+    };
+    default long getAutoUpdatePeriod() {
+        return 0;
+    };
     /**
      * 更新数据的最大退避时间，单位毫秒
      * 每次调用IDataSource.request()接口都将递增退避时间，

@@ -29,7 +29,7 @@ import static akka.japi.Util.classTag;
  */
 public class LocalCacheCreator {
     private static final Logger logger = LogManager.getLogger(LocalCacheCreator.class);
-    private static final int LOCAL_ASKER_DELAY = 1000; //asker 需要比source多一些的超时时间用于返回本地数据
+    private static final int LOCAL_ASKER_DELAY = 100; //asker 需要比source多一些的超时时间用于返回本地数据
 
     public static <TKey,TData> CacheAsker<TKey,TData> createLocalCache(ActorRefFactory actorRefFactory,
                                                                        final ICacheConfig config,

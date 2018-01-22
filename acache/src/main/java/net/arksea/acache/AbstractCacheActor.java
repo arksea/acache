@@ -2,6 +2,7 @@ package net.arksea.acache;
 
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
+import akka.actor.Cancellable;
 import akka.actor.UntypedActor;
 import akka.dispatch.OnFailure;
 import akka.dispatch.OnSuccess;
@@ -29,6 +30,8 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
     protected final CacheActorState<TKey,TData> state;
     private static Random random = new Random(System.currentTimeMillis());
     protected final DoNothingResponser<TKey> doNothing = new DoNothingResponser<>();
+    private Cancellable cleanTickTimer;
+    private Cancellable updateTickTimer;
     public AbstractCacheActor(CacheActorState<TKey,TData> state) {
         this.state = state;
     }
@@ -48,13 +51,43 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
             //清除周期不少于60秒钟，且不多于60分钟
             long period = Math.max(60000, idleCleanPeriod);
             period = Math.min(3600000, period) + random.nextInt(60000); //加随机数为了分散不同实例清除时间，调试日志也比较容易分辨
-            context().system().scheduler().schedule(
+            cleanTickTimer = context().system().scheduler().schedule(
                 Duration.create(period, TimeUnit.MILLISECONDS),
                 Duration.create(period, TimeUnit.MILLISECONDS),
                 self(),
                 new CleanTick(),
                 context().dispatcher(),
                 self());
+        }
+
+        //当autoUpdatePeriod不为零时，启动过期缓存自动更新定时器
+        long autoUpdatePeriod = state.dataSource.getAutoUpdatePeriod();
+        if (autoUpdatePeriod > 0) {
+            //自动更新周期不少于60秒钟，且不多于60分钟
+            long period = Math.max(60000, autoUpdatePeriod);
+            period = Math.min(3600000, period) + random.nextInt(60000); //加随机数为了分散不同实例清除时间，调试日志也比较容易分辨
+            updateTickTimer = context().system().scheduler().schedule(
+                Duration.create(period, TimeUnit.MILLISECONDS),
+                Duration.create(period, TimeUnit.MILLISECONDS),
+                self(),
+                new UpdateTick(),
+                context().dispatcher(),
+                self());
+        }
+        log.debug("Start CacheActor {}", self().path().toStringWithoutAddress());
+    }
+
+    @Override
+    public void postStop() throws Exception {
+        super.postStop();
+        log.debug("CacheActor {} stopped", self().path().toStringWithoutAddress());
+        if (cleanTickTimer != null) {
+            cleanTickTimer.cancel();
+            cleanTickTimer = null;
+        }
+        if (updateTickTimer != null) {
+            updateTickTimer.cancel();
+            updateTickTimer = null;
         }
     }
 
@@ -85,6 +118,8 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
             handleFailed((Failed<TKey>) o);
         } else if (o instanceof CleanTick) {
             handleCleanTick();
+        } else if (o instanceof UpdateTick) {
+            handleUpdateTick();
         } else {
             unhandled(o);
         }
@@ -152,10 +187,18 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
         final String cacheName = state.dataSource.getCacheName();
         final CachedItem item = state.cacheMap.get(failed.key);
         if (item==null) {
-            log.warn("({})请求新数据失败；无可用数据，通知请求者已失败，key={}, reqid={}", cacheName, failed.key, failed.reqid, failed.error);
+            if (failed.responser == doNothing) {
+                log.warn("({})请求新数据失败，key={}, reqid={}", cacheName, failed.key, failed.reqid, failed.error);
+            } else {
+                log.warn("({})请求新数据失败；无可用数据，通知请求者已失败，key={}, reqid={}", cacheName, failed.key, failed.reqid, failed.error);
+            }
             failed.responser.failed(ErrorCodes.FAILED, failed.error.getMessage(), self());
         } else {
-            log.warn("({})请求新数据失败；使用旧数据返回请求者，key={}, reqid={}", cacheName, failed.key, failed.reqid, failed.error);
+            if (failed.responser == doNothing) {
+                log.warn("({})请求新数据失败，key={}, reqid={}", cacheName, failed.key, failed.reqid, failed.error);
+            } else {
+                log.warn("({})请求新数据失败；使用旧数据返回请求者，key={}, reqid={}", cacheName, failed.key, failed.reqid, failed.error);
+            }
             failed.responser.send(item.getData(), self());
         }
     }
@@ -238,10 +281,27 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
     }
 
     /**
+     * 自动更新过期数据
+     */
+    protected void handleUpdateTick() {
+        log.trace("{} cacheMap.size = {}",state.dataSource.getCacheName(),state.cacheMap.size());
+        for (CachedItem<TKey,TData> item : state.cacheMap.values()) {
+            boolean isAutoUpdate = state.dataSource.isAutoUpdateExpiredData(item.key);
+            if (isAutoUpdate && item.isExpired()) {
+                log.debug("{} auto update {}",state.dataSource.getCacheName(),item.key);
+                requestData(new GetData(item.key), doNothing);
+            }
+        }
+    }
+
+    /**
      * 缓存过期检查定时通知
      */
     final static class CleanTick {
     }
+    final static class UpdateTick {
+    }
+
     final static class Failed<TKey> implements Serializable{
         final TKey key;
         final String reqid;
