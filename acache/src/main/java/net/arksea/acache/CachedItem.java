@@ -37,7 +37,6 @@ class CachedItem<TKey, TData> {
             //   当返回的数据非新数据，cache就会以退避时间周期性的尝试更新数据：3秒、6秒、12秒...
             //   当返回的数据为新数据，cache就会更新数据时间，重置退避时间周期
             this.retryBackoff = MIN_RETRY_BACKOFF;
-            this.lastRequestTime = System.currentTimeMillis();
             this.timedData = new TimedData<>(expiredTime,other);
         }
     }
