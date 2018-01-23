@@ -4,6 +4,7 @@ import akka.routing.ConsistentHashingRouter;
 import net.arksea.base.ServiceRequest;
 
 /**
+ *
  * Created by xiaohaixing_dian91 on 2017/3/30.
  */
 public abstract class CacheRequest<TKey,TData> extends ServiceRequest<TData>
@@ -21,6 +22,10 @@ public abstract class CacheRequest<TKey,TData> extends ServiceRequest<TData>
 
     @Override
     public Object consistentHashKey() {
-        return key;
+        if (key instanceof ConsistentHashingRouter.ConsistentHashable) {
+            return ((ConsistentHashingRouter.ConsistentHashable) key).consistentHashKey();
+        } else {
+            return key;
+        }
     }
 }

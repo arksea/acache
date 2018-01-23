@@ -96,7 +96,7 @@ public class LocalCacheCreator {
                 return config.waitForRespond();
             }
             @Override
-            public Future<TimedData<TData>> request(TKey key) {
+            public Future<TimedData<TData>> request(ActorRef cacheActor, String cacheName, TKey key) {
                 return request(key, timeout);
             }
             @Override
@@ -193,7 +193,7 @@ public class LocalCacheCreator {
             }
 
             @Override
-            public Future<TimedData<List>> request(TKey key) {
+            public Future<TimedData<List>> request(ActorRef cacheActor, String cacheName, TKey key) {
                 return request(key, timeout);
             }
             public Map<TKey, TimedData<List>> initCache(List<TKey> keys) {
@@ -306,7 +306,7 @@ public class LocalCacheCreator {
             }
 
             @Override
-            public Future<TimedData<List>> request(GetRange key) {
+            public Future<TimedData<List>> request(ActorRef cacheActor, String cacheName, GetRange key) {
                 return asker.ask(key, timeout).map(
                     new Mapper<CacheResponse<TKey, List>, TimedData<List>>() {
                         @Override
