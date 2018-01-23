@@ -1,5 +1,7 @@
 package net.arksea.acache;
 
+import akka.routing.ConsistentHashingRouter;
+
 /**
  *
  * Created by xiaohaixing on 2017/8/11.
@@ -19,6 +21,10 @@ public class FindOne<K,V,C> implements ICacheRequest<K,V>  {
 
     @Override
     public Object consistentHashKey() {
-        return key;
+        if (key instanceof ConsistentHashingRouter.ConsistentHashable) {
+            return ((ConsistentHashingRouter.ConsistentHashable) key).consistentHashKey();
+        } else {
+            return key;
+        }
     }
 }

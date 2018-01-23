@@ -74,7 +74,7 @@ public class LocalCacheCreator {
         //本地缓存向缓存服务请求数据
         IDataSource localCacheSource = new IDataSource<TKey,TData>() {
             @Override
-            public Future<TimedData<TData>> request(TKey key) {
+            public Future<TimedData<TData>> request(ActorRef cacheActor, String cacheName, TKey key) {
                 return request(key, timeout);
             }
             public Map<TKey, TimedData<TData>> initCache(List<TKey> keys) {
@@ -163,7 +163,7 @@ public class LocalCacheCreator {
         //本地缓存向缓存服务请求数据
         IDataSource localCacheSource = new IDataSource<TKey,List>() {
             @Override
-            public Future<TimedData<List>> request(TKey key) {
+            public Future<TimedData<List>> request(ActorRef cacheActor, String cacheName, TKey key) {
                 return request(key, timeout);
             }
             public Map<TKey, TimedData<List>> initCache(List<TKey> keys) {
@@ -269,7 +269,7 @@ public class LocalCacheCreator {
         //本地缓存向缓存服务请求数据
         IDataSource<GetRange<TKey>,List> localCacheSource = new IDataSource<GetRange<TKey>,List>() {
             @Override
-            public Future<TimedData<List>> request(GetRange key) {
+            public Future<TimedData<List>> request(ActorRef cacheActor, String cacheName, GetRange key) {
                 return asker.ask(key, timeout).map(
                     new Mapper<DataResult<TKey, List>, TimedData<List>>() {
                         @Override

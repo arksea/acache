@@ -165,7 +165,7 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
 
     protected void requestData(TKey key,IResponser responser) {
         try {
-            final Future<TimedData<TData>> future = state.dataSource.request(key);
+            final Future<TimedData<TData>> future = state.dataSource.request(self(),state.config.getCacheName(), key);
             onSuccessData(key, future, responser);
             onFailureData(key, future, responser);
         } catch (Exception ex) {

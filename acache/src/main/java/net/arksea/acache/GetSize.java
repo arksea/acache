@@ -1,5 +1,7 @@
 package net.arksea.acache;
 
+import akka.routing.ConsistentHashingRouter;
+
 import java.util.List;
 
 /**
@@ -19,6 +21,10 @@ public class GetSize<TKey> implements ICacheRequest<TKey,List> {
 
     @Override
     public Object consistentHashKey() {
-        return key;
+        if (key instanceof ConsistentHashingRouter.ConsistentHashable) {
+            return ((ConsistentHashingRouter.ConsistentHashable) key).consistentHashKey();
+        } else {
+            return key;
+        }
     }
 }
