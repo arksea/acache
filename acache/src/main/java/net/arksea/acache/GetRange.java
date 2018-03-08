@@ -1,8 +1,11 @@
 package net.arksea.acache;
 
+import akka.routing.ConsistentHashingRouter;
+
 import java.util.List;
 
 /**
+ *
  * Created by xiaohaixing_dian91 on 2017/3/30.
  */
 public class GetRange<TKey> implements ICacheRequest<TKey,List> {
@@ -21,11 +24,6 @@ public class GetRange<TKey> implements ICacheRequest<TKey,List> {
     }
 
     @Override
-    public Object consistentHashKey() {
-        return key;
-    }
-
-    @Override
     public int hashCode() {
         return key.hashCode() + start*31 + count*31;
     }
@@ -37,6 +35,15 @@ public class GetRange<TKey> implements ICacheRequest<TKey,List> {
             return start==g.start && count==g.count && this.key.equals(g.key);
         } else {
             return false;
+        }
+    }
+
+    @Override
+    public Object consistentHashKey() {
+        if (key instanceof ConsistentHashingRouter.ConsistentHashable) {
+            return ((ConsistentHashingRouter.ConsistentHashable) key).consistentHashKey();
+        } else {
+            return key;
         }
     }
 }

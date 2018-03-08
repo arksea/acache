@@ -16,7 +16,7 @@ public interface IDataSource<TKey, TData> {
      * @param key
      * @return 返回timeddata=null表示结果不缓存，返回failed给请求方
      */
-    Future<TimedData<TData>> request(TKey key);
+    Future<TimedData<TData>> request(ActorRef cacheActor, String cacheName, TKey key);
     default void preStart(ActorRef cacheActor,String cacheName) {
         //default donothing
     }
