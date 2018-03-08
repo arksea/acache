@@ -2,7 +2,7 @@ apply plugin: 'base'
 apply plugin: 'java'
 apply plugin: 'maven'
 
-String mavenVersion = '0.7.3.2-SNAPSHOT'
+String mavenVersion = '0.8.0-SNAPSHOT'
 version = mavenVersion
 
 description = """An Cache Actor"""
@@ -24,12 +24,6 @@ configure(install.repositories.mavenInstaller) {
 //    maven { url "http://repo.maven.apache.org/maven2" }
 //}
 
-
-repositories {
-    mavenLocal()
-    maven { url "http://172.17.149.8:8081/nexus/content/groups/public/" }
-    maven { url "http://repo.maven.apache.org/maven2" }
-}
 
 uploadArchives {
     repositories.mavenDeployer {

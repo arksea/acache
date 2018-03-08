@@ -16,20 +16,20 @@ public class ListCacheActor<TKey> extends AbstractCacheActor<TKey,List> {
         super(state);
     }
 
-    public static <TKey> Props props(final ICacheConfig config, final IDataSource<TKey,List> dataRequest) {
+    public static <TKey> Props props(final IDataSource<TKey,List> dataRequest) {
         return Props.create(ListCacheActor.class, new Creator<ListCacheActor>() {
             @Override
             public ListCacheActor<TKey> create() throws Exception {
-                CacheActorState<TKey,List> state = new CacheActorState<>(config,dataRequest);
+                CacheActorState<TKey,List> state = new CacheActorState<>(dataRequest);
                 return new ListCacheActor<>( state);
             }
         });
     }
 
     public static <TKey extends ConsistentHashingRouter.ConsistentHashable>
-    Props propsOfCachePool(int poolSize, ICacheConfig<TKey> cacheConfig, IDataSource<TKey,List> cacheSource) {
+    Props propsOfCachePool(int poolSize, IDataSource<TKey,List> cacheSource) {
         ConsistentHashingPool pool = new ConsistentHashingPool(poolSize);
-        return pool.props(props(cacheConfig, cacheSource));
+        return pool.props(props(cacheSource));
     }
 
     @Override
@@ -45,13 +45,13 @@ public class ListCacheActor<TKey> extends AbstractCacheActor<TKey,List> {
     }
     //-------------------------------------------------------------------------------------
     protected void handleGetRange(final GetRange<TKey> req) {
-        final String cacheName = state.config.getCacheName();
+        final String cacheName = state.dataSource.getCacheName();
         GetRangeResponser responser = new GetRangeResponser(req, sender(), cacheName);
         handleRequest(req, responser);
     }
 
     protected void handleGetSize(final GetSize<TKey> req) {
-        final String cacheName = state.config.getCacheName();
+        final String cacheName = state.dataSource.getCacheName();
         GetSizeResponser responser = new GetSizeResponser(req, sender(), cacheName);
         handleRequest(req, responser);
     }

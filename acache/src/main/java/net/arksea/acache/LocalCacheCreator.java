@@ -30,54 +30,78 @@ import static akka.japi.Util.classTag;
 public class LocalCacheCreator {
     private static final Logger logger = LogManager.getLogger(LocalCacheCreator.class);
     private static final int LOCAL_ASKER_DELAY = 100; //asker 需要比source多一些的超时时间用于返回本地数据
+
     public static <TKey,TData> CacheAsker<TKey,TData> createLocalCache(ActorRefFactory actorRefFactory,
-                                                                       ICacheConfig<TKey> localCacheConfig,
+                                                                       final ICacheConfig config,
                                                                        final List<String> remoteCacheServerPaths,
                                                                        int timeout, int initTimeout) {
-        return createLocalCache(actorRefFactory, localCacheConfig, remoteCacheServerPaths, timeout,initTimeout,
-            (source) -> CacheActor.props(localCacheConfig, source)
+        return createLocalCache(actorRefFactory, config, remoteCacheServerPaths, timeout,initTimeout,
+            (source) -> CacheActor.props(source)
         );
     }
 
     public static <TKey extends ConsistentHashingRouter.ConsistentHashable,TData>
     CacheAsker<TKey,TData> createPooledLocalCache(ActorRefFactory actorRefFactory, int poolSize,
-                                                  ICacheConfig<TKey> localCacheConfig,
+                                                  final ICacheConfig config,
                                                   final List<String> remoteCacheServerPaths,
                                                   int timeout, int initTimeout) {
-        return createLocalCache(actorRefFactory, localCacheConfig, remoteCacheServerPaths, timeout,initTimeout,
-            (source) -> CacheActor.propsOfCachePool(poolSize, localCacheConfig, source)
+        return createLocalCache(actorRefFactory, config, remoteCacheServerPaths, timeout,initTimeout,
+            (source) -> CacheActor.propsOfCachePool(poolSize, source)
         );
     }
 
     public static <TKey,TData> CacheAsker<TKey,TData> createLocalCache(ActorRefFactory actorRefFactory,
-                                                                       ICacheConfig<TKey> localCacheConfig,
+                                                                       final ICacheConfig config,
                                                                        final List<String> remoteCacheServerPaths,
                                                                        int timeout, int initTimeout,
                                                                        Function<IDataSource,Props> localCacheProps) {
-        IDataSource localCacheSource = createLocalCacheSource(actorRefFactory,localCacheConfig,remoteCacheServerPaths,timeout, initTimeout);
-        ActorRef localCachePool = actorRefFactory.actorOf(localCacheProps.apply(localCacheSource), localCacheConfig.getCacheName());
+        IDataSource localCacheSource = createLocalCacheSource(actorRefFactory,config,remoteCacheServerPaths,timeout, initTimeout);
+        ActorRef localCachePool = actorRefFactory.actorOf(localCacheProps.apply(localCacheSource), config.getCacheName());
         logger.info("Create local cache at：{}",localCachePool.path());
         ActorSelection sel = actorRefFactory.actorSelection(localCachePool.path());
         return new CacheAsker<>(sel, actorRefFactory.dispatcher(), timeout+LOCAL_ASKER_DELAY);
     }
 
     private static <TKey,TData> IDataSource createLocalCacheSource(ActorRefFactory actorRefFactory,
-                                                                  ICacheConfig<TKey> localCacheConfig,
+                                                                   final ICacheConfig config,
                                                                   final List<String> remoteCacheServerPaths,
                                                                   int timeout, int initTimeout) {
         Props serverRouterProps = new RandomGroup(remoteCacheServerPaths).props();
-        String routerName = localCacheConfig.getCacheName()+"ServerRouter";
+        String routerName = config.getCacheName()+"ServerRouter";
         ActorRef serverRouter = actorRefFactory.actorOf(serverRouterProps, routerName);
         logger.debug("Create cache server router at：{}",serverRouter.path());
         ActorSelection serverRouterSel = actorRefFactory.actorSelection(serverRouter.path());
+
         final CacheAsker<TKey, TData> asker = new CacheAsker<>(serverRouterSel, actorRefFactory.dispatcher(), timeout);
         //本地缓存向缓存服务请求数据
         IDataSource localCacheSource = new IDataSource<TKey,TData>() {
             @Override
+            public String getCacheName() {
+                return config.getCacheName();
+            }
+            @Override
+            public long getIdleTimeout(TKey key) {
+                return config.getIdleTimeout(key);
+            }
+            @Override
+            public long getIdleCleanPeriod() {
+                return config.getIdleCleanPeriod();
+            }
+            @Override
+            public long getMaxBackoff() {
+                return config.getMaxBackoff();
+            }
+            @Override
+            public boolean waitForRespond() {
+                return config.waitForRespond();
+            }
+            @Override
             public Future<TimedData<TData>> request(ActorRef cacheActor, String cacheName, TKey key) {
                 return request(key, timeout);
             }
-            public Map<TKey, TimedData<TData>> initCache(List<TKey> keys) {
+            @Override
+            public Map<TKey, TimedData<TData>> initCache(ActorRef ref) {
+                List<TKey> keys = config.getInitKeys();
                 if (keys != null && !keys.isEmpty()) {
                     Map<TKey, TimedData<TData>> map = new LinkedHashMap<>(keys.size());
                     for (TKey key : keys) {
@@ -88,7 +112,7 @@ public class LocalCacheCreator {
                             TimedData<TData> v = Await.result(f, d);
                             map.put(key, v);
                         } catch (Exception ex) {
-                            logger.warn("本地缓存({})加载失败:key={}",localCacheConfig.getCacheName(), key.toString(), ex);
+                            logger.warn("本地缓存({})加载失败:key={}",config.getCacheName(), key.toString(), ex);
                         }
                     }
                     return map;
@@ -99,14 +123,16 @@ public class LocalCacheCreator {
             private Future<TimedData<TData>> request(TKey key, long timeout1) {
                 GetData<TKey,TData> get = new GetData<>(key);
                 return asker.ask(get,timeout1).map(
-                    new Mapper<DataResult<TKey, TData>, TimedData<TData>>() {
+                    new Mapper<CacheResponse<TKey, TData>, TimedData<TData>>() {
                         @Override
-                        public TimedData<TData> apply(DataResult<TKey, TData> it) {
-                        if (it.failed == null) {
-                            return new TimedData<>(it.expiredTime, it.data);
-                        } else {
-                            throw new CacheSourceException("remote cache server error", it.failed);
-                        }
+                        public TimedData<TData> apply(CacheResponse<TKey, TData> it) {
+                            if (it.code == ErrorCodes.SUCCEED) {
+                                return new TimedData<>(it.expiredTime, it.result);
+                            } else if (it.code == ErrorCodes.INVALID_KEY) {
+                                return null;
+                            } else {
+                                throw new CacheAskException("remote cache server error: "+it.code+","+it.msg);
+                            }
                         }
                     },
                     actorRefFactory.dispatcher()
@@ -118,50 +144,54 @@ public class LocalCacheCreator {
 
     //------------------------------------------------------------------------------------------------------------------
 
-    public static <TKey>
-    CacheAsker<TKey,List> createLocalListCache(ActorRefFactory actorRefFactory,
-                                               ICacheConfig<TKey> localCacheConfig,
+    public static <TKey> CacheAsker<TKey,List> createLocalListCache(ActorRefFactory actorRefFactory,
+                                               final String cacheName,
                                                final List<String> remoteCacheServerPaths,
                                                int timeout, int initTimeout) {
-        return createLocalListCache(actorRefFactory, localCacheConfig, remoteCacheServerPaths, timeout,initTimeout,
-            source -> ListCacheActor.props(localCacheConfig, source)
+        return createLocalListCache(actorRefFactory, cacheName, remoteCacheServerPaths, timeout,initTimeout,
+            source -> ListCacheActor.props( source)
         );
     }
 
     public static <TKey extends ConsistentHashingRouter.ConsistentHashable>
     CacheAsker<TKey,List> createPooledLocalListCache(ActorRefFactory actorRefFactory, int poolSize,
-                                                     final ICacheConfig<TKey> localCacheConfig,
+                                                     final String cacheName,
                                                      final List<String> remoteCacheServerPaths,
                                                      int timeout, int initTimeout) {
-        return createLocalListCache(actorRefFactory, localCacheConfig, remoteCacheServerPaths, timeout,initTimeout,
-            source -> ListCacheActor.propsOfCachePool(poolSize, localCacheConfig, source)
+        return createLocalListCache(actorRefFactory, cacheName, remoteCacheServerPaths, timeout,initTimeout,
+            source -> ListCacheActor.propsOfCachePool(poolSize, source)
         );
     }
 
     public static <TKey> CacheAsker<TKey,List> createLocalListCache(ActorRefFactory actorRefFactory,
-                                                                    ICacheConfig<TKey> localCacheConfig,
+                                                                    final String cacheName,
                                                                     final List<String> remoteCacheServerPaths,
                                                                     int timeout, int initTimeout,
                                                                     Function<IDataSource,Props> localCacheProps) {
-        IDataSource localCacheSource = createLocalListCacheSource(actorRefFactory,localCacheConfig,remoteCacheServerPaths,timeout, initTimeout);
-        ActorRef localCachePool = actorRefFactory.actorOf(localCacheProps.apply(localCacheSource), localCacheConfig.getCacheName());
+        IDataSource localCacheSource = createLocalListCacheSource(actorRefFactory,cacheName,remoteCacheServerPaths,timeout, initTimeout);
+        ActorRef localCachePool = actorRefFactory.actorOf(localCacheProps.apply(localCacheSource), cacheName);
         logger.info("Create local cache at：{}",localCachePool.path());
         ActorSelection sel = actorRefFactory.actorSelection(localCachePool.path());
         return new CacheAsker<>(sel, actorRefFactory.dispatcher(), timeout+LOCAL_ASKER_DELAY);
     }
 
     private static <TKey> IDataSource createLocalListCacheSource(ActorRefFactory actorRefFactory,
-                                                                ICacheConfig<TKey> localCacheConfig,
+                                                                 final String cacheName,
                                                                 final List<String> remoteCacheServerPaths,
                                                                 int timeout, int initTimeout) {
         Props serverRouterProps = new RandomGroup(remoteCacheServerPaths).props();
-        String routerName = localCacheConfig.getCacheName()+"ServerRouter";
+        String routerName = cacheName+"ServerRouter";
         ActorRef serverRouter = actorRefFactory.actorOf(serverRouterProps, routerName);
         logger.debug("Create cache server router at：{}",serverRouter.path());
         ActorSelection serverRouterSel = actorRefFactory.actorSelection(serverRouter.path());
         final CacheAsker<TKey, List> cacheServerAsker = new CacheAsker<>(serverRouterSel, actorRefFactory.dispatcher(), timeout);
         //本地缓存向缓存服务请求数据
         IDataSource localCacheSource = new IDataSource<TKey,List>() {
+            @Override
+            public String getCacheName() {
+                return cacheName;
+            }
+
             @Override
             public Future<TimedData<List>> request(ActorRef cacheActor, String cacheName, TKey key) {
                 return request(key, timeout);
@@ -176,7 +206,7 @@ public class LocalCacheCreator {
                             TimedData<List> v = Await.result(f, d);
                             map.put(key, v);
                         } catch (Exception ex) {
-                            logger.warn("本地缓存({})加载失败:key={}",localCacheConfig.getCacheName(), key.toString(), ex);
+                            logger.warn("本地缓存({})加载失败:key={}",cacheName, key.toString(), ex);
                         }
                     }
                     return map;
@@ -196,13 +226,15 @@ public class LocalCacheCreator {
                         for (int index = 0; index < size; index+=COUNT) {
                             GetRange<TKey> getRange = new GetRange<>(key, index, COUNT);
                             Future f = cacheServerAsker.ask(getRange,timeout1).map(
-                                new Mapper<DataResult<TKey,List>,TimedData<List>>() {
-                                    public TimedData<List> apply(DataResult<TKey,List> dataResult) {
-                                    if (dataResult.failed == null) {
-                                        return new TimedData<>(dataResult.expiredTime, dataResult.data);
-                                    } else {
-                                        throw new CacheSourceException("remote cache server error", dataResult.failed);
-                                    }
+                                new Mapper<CacheResponse<TKey,List>,TimedData<List>>() {
+                                    public TimedData<List> apply(CacheResponse<TKey,List> dataResult) {
+                                        if (dataResult.code == ErrorCodes.SUCCEED) {
+                                            return new TimedData<>(dataResult.expiredTime, dataResult.result);
+                                        } else if(dataResult.code == ErrorCodes.INVALID_KEY) {
+                                            return null;
+                                        } else {
+                                            throw new CacheAskException("remote cache server error: "+dataResult.code+","+dataResult.msg);
+                                        }
                                     }
                                 },
                                 actorRefFactory.dispatcher());
@@ -244,23 +276,23 @@ public class LocalCacheCreator {
      * 创建每个Range的本地缓存，目的是为了防止在缓存过期时每次都更新整个列表
      *
      * @param actorRefFactory
-     * @param localCacheConfig
+     * @param cacheName
      * @param remoteCacheServerPaths
      * @param timeout
      * @param <TKey>
      * @return
      */
-    public static <TKey> CacheAsker<GetRange<TKey>,List> createRangeLocalCache(ActorRefFactory actorRefFactory, ICacheConfig<GetRange<TKey>> localCacheConfig, final List<String> remoteCacheServerPaths, int timeout) {
-        IDataSource localCacheSource = createRangeServerSource(actorRefFactory,localCacheConfig,remoteCacheServerPaths,timeout);
-        ActorRef localCachePool = actorRefFactory.actorOf(CacheActor.props(localCacheConfig, localCacheSource), localCacheConfig.getCacheName());
+    public static <TKey> CacheAsker<GetRange<TKey>,List> createRangeLocalCache(ActorRefFactory actorRefFactory, final String cacheName, final List<String> remoteCacheServerPaths, int timeout) {
+        IDataSource localCacheSource = createRangeServerSource(actorRefFactory,cacheName,remoteCacheServerPaths,timeout);
+        ActorRef localCachePool = actorRefFactory.actorOf(CacheActor.props(localCacheSource), cacheName);
         logger.info("Create PooledLocalCache at：{}",localCachePool.path());
         ActorSelection sel = actorRefFactory.actorSelection(localCachePool.path());
         return new CacheAsker<>(sel, actorRefFactory.dispatcher(), timeout+LOCAL_ASKER_DELAY);
     }
 
-    private static <TKey> IDataSource<GetRange<TKey>,List> createRangeServerSource(ActorRefFactory actorRefFactory, ICacheConfig<GetRange<TKey>> localCacheConfig, final List<String> remoteCacheServerPaths, int timeout) {
+    private static <TKey> IDataSource<GetRange<TKey>,List> createRangeServerSource(ActorRefFactory actorRefFactory, final String cacheName, final List<String> remoteCacheServerPaths, int timeout) {
         Props serverRouterProps = new RandomGroup(remoteCacheServerPaths).props();
-        String routerName = localCacheConfig.getCacheName()+"ServerRouter";
+        String routerName = cacheName+"ServerRouter";
         ActorRef serverRouter = actorRefFactory.actorOf(serverRouterProps, routerName);
         logger.debug("Create cache server router at：{}",serverRouter.path());
         ActorSelection serverRouterSel = actorRefFactory.actorSelection(serverRouter.path());
@@ -269,15 +301,22 @@ public class LocalCacheCreator {
         //本地缓存向缓存服务请求数据
         IDataSource<GetRange<TKey>,List> localCacheSource = new IDataSource<GetRange<TKey>,List>() {
             @Override
+            public String getCacheName() {
+                return cacheName;
+            }
+
+            @Override
             public Future<TimedData<List>> request(ActorRef cacheActor, String cacheName, GetRange key) {
                 return asker.ask(key, timeout).map(
-                    new Mapper<DataResult<TKey, List>, TimedData<List>>() {
+                    new Mapper<CacheResponse<TKey, List>, TimedData<List>>() {
                         @Override
-                        public TimedData<List> apply(DataResult<TKey, List> it) {
-                            if (it.failed == null) {
-                                return new TimedData<>(it.expiredTime, it.data);
+                        public TimedData<List> apply(CacheResponse<TKey, List> it) {
+                            if (it.code == ErrorCodes.SUCCEED) {
+                                return new TimedData<>(it.expiredTime, it.result);
+                            } else if (it.code == ErrorCodes.INVALID_KEY) {
+                                return null;
                             } else {
-                                throw new CacheSourceException("remote cache server error", it.failed);
+                                throw new CacheAskException("remote cache server error: "+it.code+","+it.msg);
                             }
                         }
                     },

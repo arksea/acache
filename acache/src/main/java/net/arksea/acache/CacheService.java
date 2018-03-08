@@ -1,6 +1,6 @@
 package net.arksea.acache;
 
-import akka.actor.ActorSelection;
+import akka.actor.ActorRef;
 import akka.dispatch.Mapper;
 import scala.concurrent.Await;
 import scala.concurrent.ExecutionContext;
@@ -14,15 +14,19 @@ import scala.concurrent.duration.Duration;
  * syncGet是同步访问，仅建议用于测试或者特殊的情境
  * Created by arksea on 2016/11/17.
  */
-public final class CacheAsker<K,V> {
+public final class CacheService<K,V> {
     public final long timeout;
-    public final ActorSelection cacheActor;
+    public final ActorRef cacheActor;
     public final ExecutionContext dispatcher;
 
-    public CacheAsker(ActorSelection cacheActor, ExecutionContext dispatcher, long timeout) {
+    public CacheService(ActorRef cacheActor, ExecutionContext dispatcher, long timeout) {
         this.timeout = timeout;
         this.cacheActor = cacheActor;
         this.dispatcher = dispatcher;
+    }
+
+    public void markDirty(K key) {
+        cacheActor.tell(new MarkDirty<>(key), ActorRef.noSender());
     }
 
     /**
@@ -78,7 +82,7 @@ public final class CacheAsker<K,V> {
         } catch (Exception ex) {
             throw new CacheAskException("get cache failed", ex);
         }
-        if (ret!=null && ret.code == ErrorCodes.SUCCEED) {
+        if (ret.code != ErrorCodes.SUCCEED) {
             throw new CacheAskException(ret.toString());
         }
         return ret.result;
