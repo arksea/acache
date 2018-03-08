@@ -42,6 +42,12 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
             .mapTo(classTag((Class<CacheResponse<K, V>>) (Class<?>) CacheResponse.class));
     }
 
+    @SuppressWarnings("unchecked")
+    public static <K,V> Future<CacheResponse<K,V>> ask(ActorRef cacheActor, CacheRequest req, long timeout) {
+        return Patterns.ask(cacheActor, req, timeout)
+            .mapTo(classTag((Class<CacheResponse<K, V>>) (Class<?>) CacheResponse.class));
+    }
+
     @Override
     public void preStart() {
         initCache();
@@ -223,6 +229,8 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
             public void onSuccess(TimedData<TData> timedData) throws Throwable {
                 if (timedData == null) {
                     responser.failed(ErrorCodes.INVALID_KEY,cacheName+"."+req.key+"没有对应的数据", ActorRef.noSender());
+                } else if (timedData.data == null) { //当数据源返回的数据为null时，不保存到缓存中，直接返回给请求方
+                    responser.send(timedData, ActorRef.noSender());
                 } else {
                     cacheActor.tell(new CacheResponse<>(0, "ok", req.reqid, req.key, timedData.data, cacheName, timedData.time), ActorRef.noSender());
                     responser.send(timedData, ActorRef.noSender());

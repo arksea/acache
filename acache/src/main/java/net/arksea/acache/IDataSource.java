@@ -13,7 +13,8 @@ public interface IDataSource<TKey, TData> extends ICacheConfig<TKey> {
     /**
      *
      * @param key
-     * @return 返回timeddata=null表示ErrorCode.INVALID_KEY
+     * @return 返回timeddata=null，请求者将得到CacheResponse.code == ErrorCode.INVALID_KEY， result=null的结果
+     *         返回timeddata.data=null，请求者将得到CacheResponse.code == ErrorCode.SUCCEED, result=null的结果
      */
     Future<TimedData<TData>> request(ActorRef cacheActor, String cacheName, TKey key);
     /**
