@@ -122,6 +122,10 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
             handleMarkDirty((MarkDirty)o);
         } else if (o instanceof Failed) {
             handleFailed((Failed<TKey>) o);
+        } else if (o instanceof GetHitStat) {
+            handleGetHitStat();
+        } else if (o instanceof GetAndResetHitStat) {
+            handleGetAndResetHitStat();
         } else if (o instanceof CleanTick) {
             handleCleanTick();
         } else if (o instanceof UpdateTick) {
@@ -139,13 +143,16 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
     }
 
     protected void handleRequest(final CacheRequest<TKey,TData> req, IResponser responser) {
+        state.requestCount++;
         TKey key = req.key;
         final String cacheName = state.dataSource.getCacheName();
         final CachedItem<TKey,TData> item = state.cacheMap.get(key);
         if (item == null) { //缓存的初始状态，新建一个CachedItem，从数据源读取数据
+            state.respondMiss++;
             log.trace("({})缓存未命中，发起更新请求，key={}, reqid={}", cacheName, key, req.reqid);
             requestData(req, responser);
         } else if (item.isExpired()) { //数据已过期
+            state.respondExpired++;
             if (item.isUpdateBackoff()) {
                 log.trace("({})缓存过期，更新请求Backoff中，key={}, reqid={}", cacheName, key, req.reqid);
                 responser.send(item.getData(), self());
@@ -161,6 +168,7 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
                 }
             }
         } else {//数据未过期
+            state.respondHit++;
             log.trace("({})命中缓存，key={}, reqid={}", cacheName, key, req.reqid);
             responser.send(item.getData(), self());
         }
@@ -287,7 +295,7 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
         }
         expired.clear();
     }
-
+    //----------------------------------------------------------------------------------------------------------
     /**
      * 自动更新过期数据
      */
@@ -321,5 +329,19 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
             this.responser = responser;
             this.error = error;
         }
+    }
+    //----------------------------------------------------------------------------------------------------------
+    private void handleGetHitStat() {
+        HitStat msg = new HitStat(state.requestCount, state.respondHit,state.respondMiss,state.respondExpired);
+        sender().tell(msg, self());
+    }
+    //----------------------------------------------------------------------------------------------------------
+    private void handleGetAndResetHitStat() {
+        HitStat msg = new HitStat(state.requestCount, state.respondHit,state.respondMiss,state.respondExpired);
+        state.requestCount = 0;
+        state.respondHit = 0;
+        state.respondExpired = 0;
+        state.respondMiss = 0;
+        sender().tell(msg, self());
     }
 }

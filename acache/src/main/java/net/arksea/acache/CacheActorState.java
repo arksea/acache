@@ -2,6 +2,7 @@ package net.arksea.acache;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * 保存CacheActor的配置、状态与缓存的数据，可以在CacheActor异常重启后继承
@@ -13,4 +14,8 @@ public class CacheActorState<TKey, TData> {
     public CacheActorState(IDataSource<TKey,TData> dataSource) {
         this.dataSource = dataSource;
     }
+    long requestCount; //请求数
+    long respondHit;   //命中次数
+    long respondExpired;//过期次数
+    long respondMiss;   //为命中次数
 }
