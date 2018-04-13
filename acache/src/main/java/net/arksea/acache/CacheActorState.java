@@ -15,4 +15,8 @@ public class CacheActorState<TKey, TData> {
         this.config = config;
         this.dataSource = dataSource;
     }
+    long requestCount; //请求数
+    long respondHit;   //命中次数
+    long respondExpired;//过期次数
+    long respondMiss;   //为命中次数
 }
