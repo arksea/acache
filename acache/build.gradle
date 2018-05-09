@@ -2,13 +2,14 @@ apply plugin: 'base'
 apply plugin: 'java'
 apply plugin: 'maven'
 
-String mavenVersion = '0.8.0-SNAPSHOT'
+String mavenVersion = '0.9.0-SNAPSHOT'
 version = mavenVersion
 
 description = """An Cache Actor"""
 String mavenArtifactId = name
 
 dependencies {
+    compile ('net.arksea:aregister-client:0.1-SNAPSHOT')
 }
 
 configure(install.repositories.mavenInstaller) {
