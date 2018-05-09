@@ -7,6 +7,7 @@ import akka.actor.UntypedActor;
 import akka.dispatch.OnFailure;
 import akka.dispatch.OnSuccess;
 import akka.pattern.Patterns;
+import net.arksea.dsf.service.ServiceRequest;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import scala.concurrent.Future;
@@ -111,8 +112,18 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
     @Override
     @SuppressWarnings("unchecked")
     public void onReceive(Object o) {
+        if (o instanceof ServiceRequest) {
+            ServiceRequest req = (ServiceRequest) o;
+            log.trace("onReceive(), ServiceRequest.reqid={}", req.reqid);
+            onReceiveCacheMsg(req.message, req);
+        } else {
+            onReceiveCacheMsg(o, null);
+        }
+    }
+
+    private void onReceiveCacheMsg(Object o, ServiceRequest serviceRequest) {
         if (o instanceof GetData) {
-            handleGetData((GetData<TKey,TData>)o);
+            handleGetData((GetData<TKey,TData>)o, serviceRequest);
         } else if (o instanceof DataResult) {
             handleDataResult((DataResult<TKey, TData>) o);
         } else if (o instanceof MarkDirty) {
@@ -133,9 +144,9 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
     }
 
     //-------------------------------------------------------------------------------------
-    private void handleGetData(final GetData<TKey,TData> req) {
+    private void handleGetData(final GetData<TKey,TData> req, ServiceRequest serviceRequest) {
         final String cacheName = state.config.getCacheName();
-        GetDataResponser responser = new GetDataResponser(req, sender(), cacheName);
+        GetDataResponser responser =  new GetDataResponser(req, sender(), cacheName, serviceRequest);
         handleRequest(req, responser);
     }
 
