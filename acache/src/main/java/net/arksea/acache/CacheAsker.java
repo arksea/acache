@@ -2,10 +2,13 @@ package net.arksea.acache;
 
 import akka.actor.ActorSelection;
 import akka.dispatch.Mapper;
+import akka.pattern.Patterns;
 import scala.concurrent.Await;
 import scala.concurrent.ExecutionContext;
 import scala.concurrent.Future;
 import scala.concurrent.duration.Duration;
+
+import static akka.japi.Util.classTag;
 
 /**
  * 简化访问Cache写法的帮助类，
@@ -14,7 +17,7 @@ import scala.concurrent.duration.Duration;
  * syncGet是同步访问，仅建议用于测试或者特殊的情境
  * Created by arksea on 2016/11/17.
  */
-public final class CacheAsker<K,V> {
+public final class CacheAsker<K,V> implements ICacheAsker<K,V> {
 
     public final long timeout;
     public final ActorSelection cacheActor;
@@ -59,6 +62,12 @@ public final class CacheAsker<K,V> {
                 }
             }, dispatcher);
     }
+
+    public Future<Integer> getSize(K key) {
+        GetSize<K> getSize = new GetSize<>(key);
+        return Patterns.ask(cacheActor, getSize, timeout).mapTo(classTag(Integer.class));
+    }
+
     /**
      * 同步访问方法不应作为常规使用手段，建议用于测试或者少数特殊场景
      * @param key
