@@ -2,7 +2,6 @@ package net.arksea.acache;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * 保存CacheActor的配置、状态与缓存的数据，可以在CacheActor异常重启后继承

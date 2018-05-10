@@ -1,10 +1,6 @@
 package net.arksea.acache;
 
-import akka.actor.ActorRef;
-import akka.pattern.Patterns;
 import scala.concurrent.Future;
-
-import static akka.japi.Util.classTag;
 
 /**
  *
