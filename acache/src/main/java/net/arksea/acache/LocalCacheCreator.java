@@ -34,6 +34,18 @@ public class LocalCacheCreator {
             (source) -> CacheActor.props(localCacheConfig, source)
         );
     }
+    @Deprecated
+    //保持向下兼容性 0.7.3.3
+    //use arg 'ICacheAsker<TKey, TData> remoteCacheAsker' instead of 'remoteCacheServerPaths'
+    //只会使用remoteCacheServerPaths中的第一个地址
+    public static <TKey,TData> CacheAsker<TKey,TData> createLocalCache(ActorRefFactory actorRefFactory,
+                                                                       ICacheConfig<TKey> localCacheConfig,
+                                                                       final List<String> remoteCacheServerPaths,
+                                                                       int timeout, int initTimeout) {
+        ActorSelection sel = actorRefFactory.actorSelection(remoteCacheServerPaths.get(0));
+        ICacheAsker<TKey, TData> asker = new CacheAsker<>(sel, actorRefFactory.dispatcher(), timeout);
+        return createLocalCache(actorRefFactory, localCacheConfig, asker, timeout, initTimeout);
+    }
 
     public static <TKey extends ConsistentHashingRouter.ConsistentHashable,TData>
     CacheAsker<TKey,TData> createPooledLocalCache(ActorRefFactory actorRefFactory, int poolSize,
@@ -45,7 +57,21 @@ public class LocalCacheCreator {
         );
     }
 
-    public static <TKey,TData> CacheAsker<TKey,TData> createLocalCache(ActorRefFactory actorRefFactory,
+    @Deprecated
+    //保持向下兼容性 0.7.3.3
+    //use arg 'ICacheAsker<TKey, TData> remoteCacheAsker' instead of 'remoteCacheServerPaths'
+    //只会使用remoteCacheServerPaths中的第一个地址
+    public static <TKey extends ConsistentHashingRouter.ConsistentHashable,TData>
+    CacheAsker<TKey,TData> createPooledLocalCache(ActorRefFactory actorRefFactory, int poolSize,
+                                                  ICacheConfig<TKey> localCacheConfig,
+                                                  final List<String> remoteCacheServerPaths,
+                                                  int timeout, int initTimeout) {
+        ActorSelection sel = actorRefFactory.actorSelection(remoteCacheServerPaths.get(0));
+        ICacheAsker<TKey, TData> asker = new CacheAsker<>(sel, actorRefFactory.dispatcher(), timeout);
+        return createPooledLocalCache(actorRefFactory, poolSize, localCacheConfig, asker, timeout, initTimeout);
+    }
+
+    private static <TKey,TData> CacheAsker<TKey,TData> createLocalCache(ActorRefFactory actorRefFactory,
                                                                        ICacheConfig<TKey> localCacheConfig,
                                                                        final ICacheAsker<TKey, TData> remoteCacheAsker,
                                                                        int timeout, int initTimeout,
@@ -116,6 +142,20 @@ public class LocalCacheCreator {
         );
     }
 
+    @Deprecated
+    //保持向下兼容性 0.7.3.3
+    //use arg 'ICacheAsker<TKey, TData> remoteCacheAsker' instead of 'remoteCacheServerPaths'
+    //只会使用remoteCacheServerPaths中的第一个地址
+    public static <TKey>
+    CacheAsker<TKey,List> createLocalListCache(ActorRefFactory actorRefFactory,
+                                               ICacheConfig<TKey> localCacheConfig,
+                                               final List<String> remoteCacheServerPaths,
+                                               int timeout, int initTimeout) {
+        ActorSelection sel = actorRefFactory.actorSelection(remoteCacheServerPaths.get(0));
+        ICacheAsker<TKey, List> asker = new CacheAsker<>(sel, actorRefFactory.dispatcher(), timeout);
+        return createLocalListCache(actorRefFactory, localCacheConfig, asker, timeout, initTimeout);
+    }
+
     public static <TKey extends ConsistentHashingRouter.ConsistentHashable>
     CacheAsker<TKey,List> createPooledLocalListCache(ActorRefFactory actorRefFactory, int poolSize,
                                                      final ICacheConfig<TKey> localCacheConfig,
@@ -126,7 +166,21 @@ public class LocalCacheCreator {
         );
     }
 
-    public static <TKey> CacheAsker<TKey,List> createLocalListCache(ActorRefFactory actorRefFactory,
+    @Deprecated
+    //保持向下兼容性 0.7.3.3
+    //use arg 'ICacheAsker<TKey, TData> remoteCacheAsker' instead of 'remoteCacheServerPaths'
+    //只会使用remoteCacheServerPaths中的第一个地址
+    public static <TKey extends ConsistentHashingRouter.ConsistentHashable>
+    CacheAsker<TKey,List> createPooledLocalListCache(ActorRefFactory actorRefFactory, int poolSize,
+                                                     final ICacheConfig<TKey> localCacheConfig,
+                                                     final List<String> remoteCacheServerPaths,
+                                                     int timeout, int initTimeout) {
+        ActorSelection sel = actorRefFactory.actorSelection(remoteCacheServerPaths.get(0));
+        ICacheAsker<TKey, List> asker = new CacheAsker<>(sel, actorRefFactory.dispatcher(), timeout);
+        return createPooledLocalListCache(actorRefFactory, poolSize, localCacheConfig, asker, timeout, initTimeout);
+    }
+
+    private static <TKey> CacheAsker<TKey,List> createLocalListCache(ActorRefFactory actorRefFactory,
                                                                     ICacheConfig<TKey> localCacheConfig,
                                                                     final ICacheAsker<TKey, List> remoteCacheAsker,
                                                                     int timeout, int initTimeout,
@@ -239,6 +293,19 @@ public class LocalCacheCreator {
         logger.info("Create PooledLocalCache at：{}",localCachePool.path());
         ActorSelection sel = actorRefFactory.actorSelection(localCachePool.path());
         return new CacheAsker<>(sel, actorRefFactory.dispatcher(), timeout+LOCAL_ASKER_DELAY);
+    }
+
+    @Deprecated
+    //保持向下兼容性 0.7.3.3
+    //use arg 'ICacheAsker<TKey, TData> remoteCacheAsker' instead of 'remoteCacheServerPaths'
+    //只会使用remoteCacheServerPaths中的第一个地址
+    public static <TKey> CacheAsker<GetRange<TKey>,List> createRangeLocalCache(ActorRefFactory actorRefFactory,
+                                                                               ICacheConfig<GetRange<TKey>> localCacheConfig,
+                                                                               final List<String> remoteCacheServerPaths,
+                                                                               int timeout) {
+        ActorSelection sel = actorRefFactory.actorSelection(remoteCacheServerPaths.get(0));
+        ICacheAsker<TKey, List> asker = new CacheAsker<>(sel, actorRefFactory.dispatcher(), timeout);
+        return createRangeLocalCache(actorRefFactory, localCacheConfig, asker, timeout);
     }
 
     private static <TKey> IDataSource<GetRange<TKey>,List> createRangeServerSource(ActorRefFactory actorRefFactory,
