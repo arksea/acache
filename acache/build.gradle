@@ -9,7 +9,7 @@ description = """An Cache Actor"""
 String mavenArtifactId = name
 
 dependencies {
-    compile ("net.arksea:aregister-client:0.1-SNAPSHOT")
+    compile ("net.arksea:aregister-client:0.2-SNAPSHOT")
 }
 
 configure(install.repositories.mavenInstaller) {
