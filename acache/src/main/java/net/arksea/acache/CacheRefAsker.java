@@ -1,28 +1,36 @@
 package net.arksea.acache;
 
-import akka.actor.ActorSelection;
+import akka.actor.ActorRef;
 import akka.dispatch.Mapper;
+import akka.pattern.Patterns;
 import scala.concurrent.Await;
 import scala.concurrent.ExecutionContext;
 import scala.concurrent.Future;
 import scala.concurrent.duration.Duration;
 
+import static akka.japi.Util.classTag;
+
 /**
+ * 对应 ActorSelection的版本是 CacheAsker
  * 简化访问Cache写法的帮助类，
  * get系列用于简单的直接获取值，
  * ask系列用于多个不同请求需要在返回值处理时区分返回结果地方
  * syncGet是同步访问，仅建议用于测试或者特殊的情境
  * Created by arksea on 2016/11/17.
  */
-public final class CacheAsker<K,V> {
+public final class CacheRefAsker<K,V> implements ICacheAsker<K,V> {
     public final long timeout;
-    public final ActorSelection cacheActor;
+    public final ActorRef cacheActor;
     public final ExecutionContext dispatcher;
 
-    public CacheAsker(ActorSelection cacheActor, ExecutionContext dispatcher, long timeout) {
+    public CacheRefAsker(ActorRef cacheActor, ExecutionContext dispatcher, long timeout) {
         this.timeout = timeout;
         this.cacheActor = cacheActor;
         this.dispatcher = dispatcher;
+    }
+
+    public void markDirty(K key) {
+        cacheActor.tell(new MarkDirty<>(key), ActorRef.noSender());
     }
 
     /**
@@ -63,6 +71,11 @@ public final class CacheAsker<K,V> {
                 }
             }, dispatcher);
     }
+
+    public Future<Integer> getSize(K key) {
+        GetSize<K> getSize = new GetSize<>(key);
+        return Patterns.ask(cacheActor, getSize, timeout).mapTo(classTag(Integer.class));
+    }
     /**
      * 同步访问方法不应作为常规使用手段，建议用于测试或者少数特殊场景
      * @param key
@@ -78,7 +91,7 @@ public final class CacheAsker<K,V> {
         } catch (Exception ex) {
             throw new CacheAskException("get cache failed", ex);
         }
-        if (ret!=null && ret.code == ErrorCodes.SUCCEED) {
+        if (ret.code != ErrorCodes.SUCCEED) {
             throw new CacheAskException(ret.toString());
         }
         return ret.result;

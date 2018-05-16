@@ -4,6 +4,7 @@ import akka.actor.Props;
 import akka.japi.Creator;
 import akka.routing.ConsistentHashingPool;
 import akka.routing.ConsistentHashingRouter;
+import net.arksea.dsf.service.ServiceRequest;
 
 import java.util.List;
 
@@ -35,24 +36,32 @@ public class ListCacheActor<TKey> extends AbstractCacheActor<TKey,List> {
     @Override
     @SuppressWarnings("unchecked")
     public void onReceive(Object o) {
+        if (o instanceof ServiceRequest) {
+            ServiceRequest req = (ServiceRequest) o;
+            onReceiveCacheMsg(req.message, req);
+        } else {
+            onReceiveCacheMsg(o, null);
+        }
+    }
+    private void onReceiveCacheMsg(Object o, ServiceRequest serviceRequest) {
         if (o instanceof GetRange) {
-            handleGetRange((GetRange<TKey>) o);
+            handleGetRange((GetRange<TKey>) o, serviceRequest);
         } else if (o instanceof GetSize) {
-            handleGetSize((GetSize<TKey>) o);
+            handleGetSize((GetSize<TKey>) o, serviceRequest);
         } else {
             super.onReceive(o);
         }
     }
     //-------------------------------------------------------------------------------------
-    protected void handleGetRange(final GetRange<TKey> req) {
+    protected void handleGetRange(final GetRange<TKey> req, ServiceRequest serviceRequest) {
         final String cacheName = state.dataSource.getCacheName();
-        GetRangeResponser responser = new GetRangeResponser(req, sender(), cacheName);
+        GetRangeResponser responser = new GetRangeResponser(req, sender(), cacheName, serviceRequest);
         handleRequest(req, responser);
     }
 
-    protected void handleGetSize(final GetSize<TKey> req) {
+    protected void handleGetSize(final GetSize<TKey> req, ServiceRequest serviceRequest) {
         final String cacheName = state.dataSource.getCacheName();
-        GetSizeResponser responser = new GetSizeResponser(req, sender(), cacheName);
+        GetSizeResponser responser = new GetSizeResponser(req, sender(), cacheName, serviceRequest);
         handleRequest(req, responser);
     }
 }
