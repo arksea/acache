@@ -36,7 +36,9 @@ class GetDataResponser<TData> implements IResponser<TData> {
     }
     @Override
     public void failed(Throwable ex,ActorRef sender) {
-        receiver.tell(new DataResult<>(ex, cacheName, get.key), sender);
+        Object result = new DataResult<>(ex, cacheName, get.key);
+        Object msg = request == null ?  result : new ServiceResponse(result, request);
+        receiver.tell(msg, sender);
     }
 }
 
@@ -63,7 +65,9 @@ class GetRangeResponser implements IResponser<List> {
     }
     @Override
     public void failed(Throwable ex,ActorRef sender) {
-        receiver.tell(new DataResult<>(ex, cacheName, get.key), sender);
+        Object result = new DataResult<>(ex, cacheName, get.key);
+        Object msg = request == null ?  result : new ServiceResponse(result, request);
+        receiver.tell(msg, sender);
     }
 }
 
