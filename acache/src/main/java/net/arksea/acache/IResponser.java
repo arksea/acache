@@ -1,6 +1,8 @@
 package net.arksea.acache;
 
 import akka.actor.ActorRef;
+import net.arksea.dsf.service.ServiceRequest;
+import net.arksea.dsf.service.ServiceResponse;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -11,7 +13,7 @@ import java.util.List;
  */
 public interface IResponser<TData> {
     default void send(TimedData<TData> timedData,ActorRef sender){}
-    default void failed(int code, String error,ActorRef sender) {}
+    default void failed(Throwable ex,ActorRef sender) {}
 }
 class DoNothingResponser<TData> implements IResponser<TData> {}
 
@@ -19,18 +21,24 @@ class GetDataResponser<TData> implements IResponser<TData> {
     ActorRef receiver;
     String cacheName;
     GetData get;
-    public GetDataResponser(GetData get,ActorRef receiver,String cacheName) {
+    ServiceRequest request;
+    public GetDataResponser(GetData get, ActorRef receiver, String cacheName, ServiceRequest request) {
         this.get = get;
         this.receiver = receiver;
         this.cacheName = cacheName;
+        this.request = request;
     }
     @Override
     public void send(TimedData<TData> timedData, ActorRef sender) {
-        receiver.tell(new CacheResponse<>(ErrorCodes.SUCCEED, "ok", get.reqid, get.key, timedData.data, cacheName, timedData.time), sender);
+        Object result = new DataResult<>(cacheName, get.key, timedData.time, timedData.data);
+        Object msg = request == null ?  result : new ServiceResponse(result, request);
+        receiver.tell(msg, sender);
     }
     @Override
-    public void failed(int code, String error,ActorRef sender) {
-        receiver.tell(new CacheResponse<>(code, error, get.reqid, get.key, cacheName), sender);
+    public void failed(Throwable ex,ActorRef sender) {
+        Object result = new DataResult<>(ex, cacheName, get.key);
+        Object msg = request == null ?  result : new ServiceResponse(result, request);
+        receiver.tell(msg, sender);
     }
 }
 
@@ -38,26 +46,28 @@ class GetRangeResponser implements IResponser<List> {
     ActorRef receiver;
     String cacheName;
     GetRange get;
-    public GetRangeResponser(GetRange get,ActorRef receiver,String cacheName) {
+    ServiceRequest request;
+    public GetRangeResponser(GetRange get,ActorRef receiver,String cacheName,ServiceRequest request) {
         this.get = get;
         this.receiver = receiver;
         this.cacheName = cacheName;
+        this.request = request;
     }
     @Override
     public void send(TimedData<List> timedData,ActorRef sender) {
         int size = timedData.data.size();
         int end = get.count > size - get.start ? size : get.start + get.count;
-        if (get.start >= end) {
-            ArrayList list = new ArrayList<>(0);
-            receiver.tell(new CacheResponse<>(ErrorCodes.SUCCEED, "ok", get.reqid, get.key, list, cacheName, timedData.time), sender);
-        } else {
-            ArrayList list = new ArrayList(timedData.data.subList(get.start, end));
-            receiver.tell(new CacheResponse<>(ErrorCodes.SUCCEED, "ok", get.reqid, get.key, list, cacheName, timedData.time), sender);
-        }
+        ArrayList list = get.start >= end ? new ArrayList<>(0)
+                         : new ArrayList(timedData.data.subList(get.start, end));
+        Object result = new DataResult<>(cacheName, get.key, timedData.time,list);
+        Object msg = request == null ?  result : new ServiceResponse(result, request);
+        receiver.tell(msg, sender);
     }
     @Override
-    public void failed(int code,String error,ActorRef sender) {
-        receiver.tell(new CacheResponse<>(code, error, get.reqid, get.key, cacheName), sender);
+    public void failed(Throwable ex,ActorRef sender) {
+        Object result = new DataResult<>(ex, cacheName, get.key);
+        Object msg = request == null ?  result : new ServiceResponse(result, request);
+        receiver.tell(msg, sender);
     }
 }
 
@@ -65,17 +75,23 @@ class GetSizeResponser implements IResponser<List> {
     ActorRef receiver;
     String cacheName;
     GetSize get;
-    public GetSizeResponser(GetSize get,ActorRef receiver,String cacheName) {
+    ServiceRequest request;
+    public GetSizeResponser(GetSize get,ActorRef receiver,String cacheName,ServiceRequest request) {
         this.get = get;
         this.receiver = receiver;
         this.cacheName = cacheName;
+        this.request = request;
     }
     @Override
     public void send(TimedData<List> timedData, ActorRef sender) {
-        receiver.tell(timedData.data.size(), sender);
+        Integer result =  timedData.data.size();
+        Object msg = request == null ?  result : new ServiceResponse(result, request);
+        receiver.tell(msg, sender);
     }
     @Override
-    public void failed(int code, String error,ActorRef sender) {
-        receiver.tell(-1, sender);
+    public void failed(Throwable ex,ActorRef sender) {
+        Integer result = -1;
+        Object msg = request == null ?  result : new ServiceResponse(result, request);
+        receiver.tell(msg, sender);
     }
 }

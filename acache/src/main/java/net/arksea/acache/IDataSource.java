@@ -3,34 +3,32 @@ package net.arksea.acache;
 import akka.actor.ActorRef;
 import scala.concurrent.Future;
 
+import java.util.List;
 import java.util.Map;
 
 /**
  *
  * Created by arksea on 2016/11/17.
  */
-public interface IDataSource<TKey, TData> extends ICacheConfig<TKey> {
+public interface IDataSource<TKey, TData> {
     /**
      *
      * @param key
-     * @return 返回timeddata=null，请求者将得到CacheResponse.code == ErrorCode.INVALID_KEY， result=null的结果
-     *         返回timeddata.data=null，请求者将得到CacheResponse.code == ErrorCode.SUCCEED, result=null的结果
+     * @return 返回timeddata=null表示结果不缓存，返回failed给请求方
      */
     Future<TimedData<TData>> request(ActorRef cacheActor, String cacheName, TKey key);
+    default void preStart(ActorRef cacheActor,String cacheName) {
+        //default donothing
+    }
     /**
-     * 此处定义的是阻塞式的同步初始化，需要异步初始化可以通过GetData请求进行初始化
+     * 此处定义的是阻塞式的同步初始化，需要异步初始化可以不实现此接口，在外部通过调用GetData请求进行初始化
+     * @param keys
      * @return
      */
-    default Map<TKey, TimedData<TData>> initCache(ActorRef cacheActor) {
+    default Map<TKey, TimedData<TData>> initCache(List<TKey> keys) {
         return null;
     }
-
-    /**
-     * 当数据被标识为脏后会回调此接口进行必要的处理
-     * @param cacheActor
-     * @param event
-     */
-    default void afterDirtyMarked(ActorRef cacheActor, MarkDirty event) {
+    default void afterDirtyMarked(ActorRef cacheActor, String cacheName, MarkDirty event) {
         //default donothing
     }
 }

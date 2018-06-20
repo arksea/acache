@@ -19,7 +19,12 @@ import static akka.japi.Util.classTag;
 public final class FutureUtils {
     private FutureUtils() {}
     public static <T> void completeFutures(ExecutionContext dispatcher, Iterable<Future<T>> futures, Consumer2<Throwable,Iterable<T>> func) {
-        Futures.sequence(futures,dispatcher).onComplete(new OnComplete<Iterable<T>>() {
+        Futures.sequence(futures,dispatcher).map(
+            new Mapper<Iterable<T>, Iterable<T>>() {
+                public Iterable<T> apply(Iterable<T> it) {
+                    return it;
+                }
+            },dispatcher).onComplete(new OnComplete<Iterable<T>>() {
             @Override
             public void onComplete(Throwable ex, Iterable<T> values) throws Throwable {
                 func.accept(ex, values);
