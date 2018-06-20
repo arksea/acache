@@ -7,23 +7,22 @@ import scala.concurrent.Future;
  * Created by xiaohaixing on 2018/5/4.
  */
 public interface ICacheAsker<K,V> {
-    void markDirty(K key);
     /**
      * 直接用key作为参数
      * @param key
      * @return
      */
-    Future<CacheResponse<K,V>> ask(K key);
+    Future<DataResult<K,V>> ask(K key);
 
-    Future<CacheResponse<K,V>> ask(CacheRequest<K,V> req);
+    Future<DataResult<K,V>> ask(ICacheRequest<K,V> req);
 
-    Future<CacheResponse<K,V>> ask(CacheRequest<K,V> req, long timeout);
+    Future<DataResult<K,V>> ask(ICacheRequest<K,V> req, long timeout);
 
     Future<V> get(K key);
 
-    Future<V> get(CacheRequest<K,V> req);
+    Future<V> get(ICacheRequest<K,V> req);
 
-    Future<V> get(CacheRequest<K,V> req, long timeout);
+    Future<V> get(ICacheRequest<K,V> req, long timeout);
 
     Future<Integer> getSize(K key);
     /**

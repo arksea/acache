@@ -17,20 +17,20 @@ public class ListCacheActor<TKey> extends AbstractCacheActor<TKey,List> {
         super(state);
     }
 
-    public static <TKey> Props props(final IDataSource<TKey,List> dataRequest) {
+    public static <TKey> Props props(final ICacheConfig config, final IDataSource<TKey,List> dataRequest) {
         return Props.create(ListCacheActor.class, new Creator<ListCacheActor>() {
             @Override
             public ListCacheActor<TKey> create() throws Exception {
-                CacheActorState<TKey,List> state = new CacheActorState<>(dataRequest);
+                CacheActorState<TKey,List> state = new CacheActorState<>(config,dataRequest);
                 return new ListCacheActor<>( state);
             }
         });
     }
 
     public static <TKey extends ConsistentHashingRouter.ConsistentHashable>
-    Props propsOfCachePool(int poolSize, IDataSource<TKey,List> cacheSource) {
+    Props propsOfCachePool(int poolSize, ICacheConfig<TKey> cacheConfig, IDataSource<TKey,List> cacheSource) {
         ConsistentHashingPool pool = new ConsistentHashingPool(poolSize);
-        return pool.props(props(cacheSource));
+        return pool.props(props(cacheConfig, cacheSource));
     }
 
     @Override
@@ -43,6 +43,7 @@ public class ListCacheActor<TKey> extends AbstractCacheActor<TKey,List> {
             onReceiveCacheMsg(o, null);
         }
     }
+
     private void onReceiveCacheMsg(Object o, ServiceRequest serviceRequest) {
         if (o instanceof GetRange) {
             handleGetRange((GetRange<TKey>) o, serviceRequest);
@@ -52,15 +53,16 @@ public class ListCacheActor<TKey> extends AbstractCacheActor<TKey,List> {
             super.onReceive(o);
         }
     }
+
     //-------------------------------------------------------------------------------------
     protected void handleGetRange(final GetRange<TKey> req, ServiceRequest serviceRequest) {
-        final String cacheName = state.dataSource.getCacheName();
+        final String cacheName = state.config.getCacheName();
         GetRangeResponser responser = new GetRangeResponser(req, sender(), cacheName, serviceRequest);
         handleRequest(req, responser);
     }
 
     protected void handleGetSize(final GetSize<TKey> req, ServiceRequest serviceRequest) {
-        final String cacheName = state.dataSource.getCacheName();
+        final String cacheName = state.config.getCacheName();
         GetSizeResponser responser = new GetSizeResponser(req, sender(), cacheName, serviceRequest);
         handleRequest(req, responser);
     }

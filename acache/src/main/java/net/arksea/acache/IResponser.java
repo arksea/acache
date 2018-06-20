@@ -13,7 +13,7 @@ import java.util.List;
  */
 public interface IResponser<TData> {
     default void send(TimedData<TData> timedData,ActorRef sender){}
-    default void failed(int code, String error,ActorRef sender) {}
+    default void failed(Throwable ex,ActorRef sender) {}
 }
 class DoNothingResponser<TData> implements IResponser<TData> {}
 
@@ -30,14 +30,15 @@ class GetDataResponser<TData> implements IResponser<TData> {
     }
     @Override
     public void send(TimedData<TData> timedData, ActorRef sender) {
-        Object result = new CacheResponse<>(ErrorCodes.SUCCEED, "ok", get.reqid, get.key, timedData.data, cacheName, timedData.time);
+        Object result = new DataResult<>(cacheName, get.key, timedData.time, timedData.data);
         Object msg = request == null ?  result : new ServiceResponse(result, request);
         receiver.tell(msg, sender);
-
     }
     @Override
-    public void failed(int code, String error,ActorRef sender) {
-        receiver.tell(new CacheResponse<>(code, error, get.reqid, get.key, cacheName), sender);
+    public void failed(Throwable ex,ActorRef sender) {
+        Object result = new DataResult<>(ex, cacheName, get.key);
+        Object msg = request == null ?  result : new ServiceResponse(result, request);
+        receiver.tell(msg, sender);
     }
 }
 
@@ -57,14 +58,16 @@ class GetRangeResponser implements IResponser<List> {
         int size = timedData.data.size();
         int end = get.count > size - get.start ? size : get.start + get.count;
         ArrayList list = get.start >= end ? new ArrayList<>(0)
-            : new ArrayList(timedData.data.subList(get.start, end));
-        Object result = new CacheResponse<>(ErrorCodes.SUCCEED, "ok", get.reqid, get.key, list, cacheName, timedData.time);
+                         : new ArrayList(timedData.data.subList(get.start, end));
+        Object result = new DataResult<>(cacheName, get.key, timedData.time,list);
         Object msg = request == null ?  result : new ServiceResponse(result, request);
         receiver.tell(msg, sender);
     }
     @Override
-    public void failed(int code,String error,ActorRef sender) {
-        receiver.tell(new CacheResponse<>(code, error, get.reqid, get.key, cacheName), sender);
+    public void failed(Throwable ex,ActorRef sender) {
+        Object result = new DataResult<>(ex, cacheName, get.key);
+        Object msg = request == null ?  result : new ServiceResponse(result, request);
+        receiver.tell(msg, sender);
     }
 }
 
@@ -86,7 +89,7 @@ class GetSizeResponser implements IResponser<List> {
         receiver.tell(msg, sender);
     }
     @Override
-    public void failed(int code, String error,ActorRef sender) {
+    public void failed(Throwable ex,ActorRef sender) {
         Integer result = -1;
         Object msg = request == null ?  result : new ServiceResponse(result, request);
         receiver.tell(msg, sender);

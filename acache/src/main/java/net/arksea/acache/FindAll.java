@@ -2,20 +2,20 @@ package net.arksea.acache;
 
 import akka.routing.ConsistentHashingRouter;
 
-import java.util.List;
-
 /**
  *
- * Created by xiaohaixing on 2017/8/13.
+ * Created by xiaohaixing on 2017/8/11.
  */
-public class GetSize<TKey> implements ICacheRequest<TKey,List> {
-    public final TKey key;
+public class FindAll<K,V,C> implements ICacheRequest<K,V>  {
+    public final K key;
+    public final C condition;
 
-    public GetSize(TKey key) {
+    public FindAll(K key, C condition) {
         this.key = key;
+        this.condition = condition;
     }
 
-    public TKey getKey() {
+    public K getKey() {
         return key;
     }
 

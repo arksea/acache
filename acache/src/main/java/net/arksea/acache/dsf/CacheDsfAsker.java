@@ -31,18 +31,18 @@ public final class CacheDsfAsker<K,V> implements ICacheAsker<K,V> {
     }
 
     @Override
-    public Future<CacheResponse<K, V>> ask(K key) {
+    public Future<DataResult<K, V>> ask(K key) {
         return ask(new GetData<>(key));
     }
 
     @Override
-    public Future<CacheResponse<K, V>> ask(CacheRequest<K, V> req) {
+    public Future<DataResult<K, V>> ask(ICacheRequest<K, V> req) {
         return ask(req, this.timeout);
     }
 
     @Override
-    public Future<CacheResponse<K, V>> ask(CacheRequest<K, V> req, long timeout) {
-        return client.request(req, timeout).mapTo(classTag((Class<CacheResponse<K, V>>) (Class<?>) CacheResponse.class));
+    public Future<DataResult<K, V>> ask(ICacheRequest<K, V> req, long timeout) {
+        return client.request(req, timeout).mapTo(classTag((Class<DataResult<K, V>>) (Class<?>) DataResult.class));
     }
 
     @Override
@@ -51,20 +51,20 @@ public final class CacheDsfAsker<K,V> implements ICacheAsker<K,V> {
     }
 
     @Override
-    public Future<V> get(CacheRequest<K, V> req) {
+    public Future<V> get(ICacheRequest<K, V> req) {
         return get(req, this.timeout);
     }
 
     @Override
-    public Future<V> get(CacheRequest<K, V> req, long timeout) {
-        Future<CacheResponse<K,V>> f = ask(req, timeout);
+    public Future<V> get(ICacheRequest<K, V> req, long timeout) {
+        Future<DataResult<K,V>> f = ask(req, timeout);
         return f.map(
-            new Mapper<CacheResponse<K,V>,V>() {
-                public V apply(CacheResponse<K,V> ret) {
-                    if (ret.code == ErrorCodes.SUCCEED) {
-                        return ret.result;
+            new Mapper<DataResult<K,V>,V>() {
+                public V apply(DataResult<K,V> ret) {
+                    if (ret.failed == null) {
+                        return ret.data;
                     } else {
-                        throw new CacheAskException(ret.toString());
+                        throw new RuntimeException(ret.cacheName+"获取数据失败", ret.failed);
                     }
                 }
             }, dispatcher);
@@ -84,17 +84,17 @@ public final class CacheDsfAsker<K,V> implements ICacheAsker<K,V> {
      */
     @Override
     public V syncGet(K key) throws CacheAskException {
-        CacheResponse<K, V> ret;
+        DataResult<K, V> ret;
         try {
-            Future<CacheResponse<K, V>> f = ask(key);
+            Future<DataResult<K, V>> f = ask(key);
             Duration d = Duration.create(timeout, "ms");
             ret = Await.result(f, d);
         } catch (Exception ex) {
             throw new CacheAskException("get cache failed", ex);
         }
-        if (ret.code != ErrorCodes.SUCCEED) {
-            throw new CacheAskException(ret.toString());
+        if (ret!=null && ret.failed != null) {
+            throw new CacheAskException("get cache failed", ret.failed);
         }
-        return ret.result;
+        return ret.data;
     }
 }
