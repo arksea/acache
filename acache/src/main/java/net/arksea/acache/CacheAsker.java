@@ -1,5 +1,6 @@
 package net.arksea.acache;
 
+import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
 import akka.dispatch.Mapper;
 import akka.pattern.Patterns;
@@ -27,6 +28,10 @@ public final class CacheAsker<K,V> implements ICacheAsker<K,V> {
         this.timeout = timeout;
         this.cacheActor = cacheActor;
         this.dispatcher = dispatcher;
+    }
+
+    public void markDirty(K key) {
+        cacheActor.tell(new MarkDirty<>(key), ActorRef.noSender());
     }
 
     public Future<DataResult<K,V>> ask(K key) {
