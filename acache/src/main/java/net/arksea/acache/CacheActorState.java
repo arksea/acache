@@ -11,12 +11,11 @@ public class CacheActorState<TKey, TData> {
     public final Map<TKey, CachedItem<TKey,TData>> cacheMap = new ConcurrentHashMap<>();
     public final ICacheConfig<TKey> config;
     public final IDataSource<TKey,TData> dataSource;
-    public CacheActorState(final ICacheConfig<TKey> config, IDataSource<TKey,TData> dataSource) {
+    public final IHitStat<TKey> hitStat;
+
+    public CacheActorState(final ICacheConfig<TKey> config, IDataSource<TKey,TData> dataSource, IHitStat<TKey> hitStat) {
         this.config = config;
         this.dataSource = dataSource;
+        this.hitStat = hitStat;
     }
-    long requestCount; //请求数
-    long respondHit;   //命中次数
-    long respondExpired;//过期次数
-    long respondMiss;   //为命中次数
 }
