@@ -18,10 +18,14 @@ public class ListCacheActor<TKey> extends AbstractCacheActor<TKey,List> {
     }
 
     public static <TKey> Props props(final ICacheConfig config, final IDataSource<TKey,List> dataRequest) {
+        return props(config, dataRequest, new IHitStat<TKey>() {});
+    }
+
+    public static <TKey> Props props(final ICacheConfig config, final IDataSource<TKey,List> dataRequest, final IHitStat<TKey> hitStat) {
         return Props.create(ListCacheActor.class, new Creator<ListCacheActor>() {
             @Override
             public ListCacheActor<TKey> create() throws Exception {
-                CacheActorState<TKey,List> state = new CacheActorState<>(config,dataRequest);
+                CacheActorState<TKey,List> state = new CacheActorState<>(config,dataRequest,hitStat);
                 return new ListCacheActor<>( state);
             }
         });
@@ -29,8 +33,13 @@ public class ListCacheActor<TKey> extends AbstractCacheActor<TKey,List> {
 
     public static <TKey extends ConsistentHashingRouter.ConsistentHashable>
     Props propsOfCachePool(int poolSize, ICacheConfig<TKey> cacheConfig, IDataSource<TKey,List> cacheSource) {
+        return propsOfCachePool(poolSize, cacheConfig, cacheSource, new IHitStat<TKey>() {});
+    }
+
+    public static <TKey extends ConsistentHashingRouter.ConsistentHashable>
+    Props propsOfCachePool(int poolSize, ICacheConfig<TKey> cacheConfig, IDataSource<TKey,List> cacheSource, final IHitStat<TKey> hitStat) {
         ConsistentHashingPool pool = new ConsistentHashingPool(poolSize);
-        return pool.props(props(cacheConfig, cacheSource));
+        return pool.props(props(cacheConfig, cacheSource, hitStat));
     }
 
     @Override
