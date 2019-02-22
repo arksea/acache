@@ -28,7 +28,7 @@ public interface IDataSource<TKey, TData> {
     default Map<TKey, TimedData<TData>> initCache(List<TKey> keys) {
         return null;
     }
-    default void afterDirtyMarked(ActorRef cacheActor, String cacheName, MarkDirty event) {
+    default void afterDirtyMarked(ActorRef cacheActor, String cacheName, TKey key) {
         //default donothing
     }
 }
