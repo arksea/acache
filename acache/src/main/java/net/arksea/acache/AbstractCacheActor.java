@@ -308,7 +308,10 @@ public abstract class AbstractCacheActor<TKey, TData> extends AbstractActor {
     protected void handleUpdateTick() {
         log.trace("{} cacheMap.size = {}",state.config.getCacheName(),state.cacheMap.size());
         for (CachedItem<TKey,TData> item : state.cacheMap.values()) {
-            boolean isAutoUpdate = state.config.isAutoUpdateExpiredData(item.key);
+            boolean isAutoUpdate = state.dataSource.isAutoUpdateExpiredData(item.key, item.getData().data);
+            if (!isAutoUpdate) {
+                isAutoUpdate=state.config.isAutoUpdateExpiredData(item.key);
+            }
             if (isAutoUpdate && item.isExpired()) {
                 log.debug("{} auto update {}",state.config.getCacheName(),item.key);
                 requestData(item.key, doNothing);

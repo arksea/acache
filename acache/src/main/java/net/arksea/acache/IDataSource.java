@@ -31,4 +31,7 @@ public interface IDataSource<TKey, TData> {
     default void afterDirtyMarked(ActorRef cacheActor, String cacheName, TKey key) {
         //default donothing
     }
+    default boolean isAutoUpdateExpiredData(TKey key, TData data) {
+        return false;
+    };
 }
