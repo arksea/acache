@@ -309,9 +309,15 @@ public abstract class AbstractCacheActor<TKey, TData> extends AbstractActor {
         log.trace("{} cacheMap.size = {}",state.config.getCacheName(),state.cacheMap.size());
         for (CachedItem<TKey,TData> item : state.cacheMap.values()) {
             boolean isAutoUpdate = state.dataSource.isAutoUpdateExpiredData(item.key, item.getData().data);
+            //-------------------------------------------------------------
+            //todo: 0.7.4.1暂时的兼容0.7.4处理，升级到0.7.5版本后删除此兼容
+            //此时isAutoUpdate为true说明，已经实现了IDataSource.isAutoUpdateExpiredData,无需再做兼容处理
+            //               为false则做兼容处理：1、如果实现了新接口，必然会删除config.isAutoUpdateExpiredData的代码，此时默认返回也为false不会有副作用
+            //                                  2、未实现，用旧接口结果即为兼容要的效果
             if (!isAutoUpdate) {
                 isAutoUpdate=state.config.isAutoUpdateExpiredData(item.key);
             }
+            //-----------------------------------------------------------
             if (isAutoUpdate && item.isExpired()) {
                 log.debug("{} auto update {}",state.config.getCacheName(),item.key);
                 requestData(item.key, doNothing);
