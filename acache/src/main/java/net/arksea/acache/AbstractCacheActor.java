@@ -162,7 +162,7 @@ public abstract class AbstractCacheActor<TKey, TData> extends AbstractActor {
             state.hitStat.onExpired(req.getKey());
             if (item.isUpdateBackoff()) {
                 log.trace("({})缓存过期，更新请求Backoff中，key={}", cacheName, key);
-                responser.send(item.getData(), self());
+                responser.send(item.getDataAndUpdateLastRequestTime(), self());
             } else {
                 item.onRequestUpdate(state.config.getMaxBackoff());
                 if (state.config.waitForRespond()) {
@@ -170,14 +170,14 @@ public abstract class AbstractCacheActor<TKey, TData> extends AbstractActor {
                     requestData(key, responser);
                 } else {
                     log.trace("({})缓存过期，发起更新请求，暂时使用旧数据返回请求者，key={}", cacheName, key);
-                    responser.send(item.getData(), self());
+                    responser.send(item.getDataAndUpdateLastRequestTime(), self());
                     requestData(key, doNothing);
                 }
             }
         } else {//数据未过期
             state.hitStat.onHit(req.getKey());
             log.trace("({})命中缓存，key={}", cacheName, key);
-            responser.send(item.getData(), self());
+            responser.send(item.getDataAndUpdateLastRequestTime(), self());
         }
     }
 
@@ -220,7 +220,7 @@ public abstract class AbstractCacheActor<TKey, TData> extends AbstractActor {
             } else {
                 log.warn("({})请求新数据失败；使用旧数据返回请求者，key={}", cacheName, failed.key, failed.error);
             }
-            failed.responser.send(item.getData(), self());
+            failed.responser.send(item.getDataAndUpdateLastRequestTime(), self());
         }
     }
     //-------------------------------------------------------------------------------------
@@ -308,7 +308,8 @@ public abstract class AbstractCacheActor<TKey, TData> extends AbstractActor {
     protected void handleUpdateTick() {
         log.trace("{} cacheMap.size = {}",state.config.getCacheName(),state.cacheMap.size());
         for (CachedItem<TKey,TData> item : state.cacheMap.values()) {
-            boolean isAutoUpdate = state.dataSource.isAutoUpdateExpiredData(item.key, item.getData().data);
+            TData data = item.timedData.data; //注意此处不能用getData()，getData（）会更新最后缓存访问时间，会造成idle无法过期
+            boolean isAutoUpdate = state.dataSource.isAutoUpdateExpiredData(item.key, data);
             //-------------------------------------------------------------
             //todo: 0.7.4.1暂时的兼容0.7.4处理，升级到0.7.5版本后删除此兼容
             //此时isAutoUpdate为true说明，已经实现了IDataSource.isAutoUpdateExpiredData,无需再做兼容处理
