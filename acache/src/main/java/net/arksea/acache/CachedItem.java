@@ -20,7 +20,9 @@ class CachedItem<TKey, TData> {
         this.key = key;
     }
 
-    public TimedData<TData> getData() {
+    //注意，注意，注意： 此处的getData会更新最后缓存访问时间，不适当的访问可能造成idle无法过期
+    //命名成这么长也是为了强调这一点 -_-!
+    TimedData<TData> getDataAndUpdateLastRequestTime() {
         lastRequestTime = System.currentTimeMillis();
         return timedData;
     }

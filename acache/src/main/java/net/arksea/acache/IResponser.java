@@ -11,13 +11,19 @@ import java.util.List;
  * 根据请求类型，和缓存的值，构造返回数据
  * Created by xiaohaixing_dian91 on 2017/3/31.
  */
-public interface IResponser<TData> {
-    default void send(TimedData<TData> timedData,ActorRef sender){}
-    default void failed(Throwable ex,ActorRef sender) {}
+public interface IResponser<T> {
+    void send(T result,ActorRef sender);
+    void failed(Throwable ex,ActorRef sender);
 }
-class DoNothingResponser<TData> implements IResponser<TData> {}
 
-class GetDataResponser<TData> implements IResponser<TData> {
+class DoNothingResponser<T> implements IResponser<T> {
+    public void send(T result,ActorRef sender){
+    }
+    public void failed(Throwable ex,ActorRef sender) {
+    }
+}
+
+class GetDataResponser implements IResponser<TimedData> {
     ActorRef receiver;
     String cacheName;
     GetData get;
@@ -29,7 +35,7 @@ class GetDataResponser<TData> implements IResponser<TData> {
         this.request = request;
     }
     @Override
-    public void send(TimedData<TData> timedData, ActorRef sender) {
+    public void send(TimedData timedData, ActorRef sender) {
         Object result = new DataResult<>(cacheName, get.key, timedData.time, timedData.data);
         Object msg = request == null ?  result : new ServiceResponse(result, request);
         receiver.tell(msg, sender);
@@ -42,7 +48,7 @@ class GetDataResponser<TData> implements IResponser<TData> {
     }
 }
 
-class GetRangeResponser implements IResponser<List> {
+class GetRangeResponser implements IResponser<TimedData<List>> {
     ActorRef receiver;
     String cacheName;
     GetRange get;
@@ -71,7 +77,7 @@ class GetRangeResponser implements IResponser<List> {
     }
 }
 
-class GetSizeResponser implements IResponser<List> {
+class GetSizeResponser implements IResponser<TimedData<List>> {
     ActorRef receiver;
     String cacheName;
     GetSize get;

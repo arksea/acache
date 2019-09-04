@@ -1,11 +1,9 @@
 package net.arksea.acache;
 
-import akka.actor.ActorRef;
-import akka.actor.ActorSelection;
-import akka.actor.Cancellable;
-import akka.actor.UntypedActor;
+import akka.actor.*;
 import akka.dispatch.OnFailure;
 import akka.dispatch.OnSuccess;
+import akka.japi.pf.ReceiveBuilder;
 import akka.pattern.Patterns;
 import net.arksea.dsf.service.ServiceRequest;
 import org.apache.logging.log4j.LogManager;
@@ -26,7 +24,7 @@ import static akka.japi.Util.classTag;
  * 数据本地缓存
  * Created by arksea on 2016/11/17.
  */
-public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
+public abstract class AbstractCacheActor<TKey, TData> extends AbstractActor {
     private static final Logger log = LogManager.getLogger(AbstractCacheActor.class);
     protected final CacheActorState<TKey,TData> state;
     private static Random random = new Random(System.currentTimeMillis());
@@ -92,36 +90,24 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
         }
     }
 
-    private void initCache() {
-        List<TKey> keys = state.config.getInitKeys();
-        if (keys != null && !keys.isEmpty()) {
-            log.info("初始化缓存({})", state.config.getCacheName());
-            Map<TKey, TimedData<TData>> items = state.dataSource.initCache(keys);
-            if (items != null) {
-                for (Map.Entry<TKey, TimedData<TData>> e : items.entrySet()) {
-                    CachedItem<TKey, TData> item = new CachedItem<>(e.getKey());
-                    TimedData<TData> value = e.getValue();
-                    item.setData(value.data, value.time);
-                    state.cacheMap.put(e.getKey(), item);
-                }
-                log.info("初始化缓存({})完成，共加载{}项", state.config.getCacheName(), items.size());
-            }
-        }
-    }
-
     @Override
-    @SuppressWarnings("unchecked")
-    public void onReceive(Object o) {
-        if (o instanceof ServiceRequest) {
-            ServiceRequest req = (ServiceRequest) o;
-            log.trace("onReceive(), ServiceRequest.reqid={}", req.reqid);
-            onReceiveCacheMsg(req.message, req);
-        } else {
-            onReceiveCacheMsg(o, null);
-        }
+    public Receive createReceive() {
+        return ReceiveBuilder.create()
+            .match(ServiceRequest.class, this::onReceiveServiceRequest)
+            .match(Object.class, this::onReceiveObject)
+            .build();
     }
 
-    private void onReceiveCacheMsg(Object o, ServiceRequest serviceRequest) {
+    private void onReceiveServiceRequest(ServiceRequest req) {
+        log.trace("onReceive(), ServiceRequest.reqid={}", req.reqid);
+        onReceiveCacheMsg(req.message, req);
+    }
+
+    private void onReceiveObject(Object o) {
+        onReceiveCacheMsg(o, null);
+    }
+
+    protected void onReceiveCacheMsg(Object o, ServiceRequest serviceRequest) {
         if (o instanceof GetData) {
             handleGetData((GetData<TKey,TData>)o, serviceRequest);
         } else if (o instanceof DataResult) {
@@ -136,6 +122,23 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
             handleUpdateTick();
         } else {
             unhandled(o);
+        }
+    }
+
+    private void initCache() {
+        List<TKey> keys = state.config.getInitKeys();
+        if (keys != null && !keys.isEmpty()) {
+            log.info("初始化缓存({})", state.config.getCacheName());
+            Map<TKey, TimedData<TData>> items = state.dataSource.initCache(keys);
+            if (items != null) {
+                for (Map.Entry<TKey, TimedData<TData>> e : items.entrySet()) {
+                    CachedItem<TKey, TData> item = new CachedItem<>(e.getKey());
+                    TimedData<TData> value = e.getValue();
+                    item.setData(value.data, value.time);
+                    state.cacheMap.put(e.getKey(), item);
+                }
+                log.info("初始化缓存({})完成，共加载{}项", state.config.getCacheName(), items.size());
+            }
         }
     }
 
@@ -159,7 +162,7 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
             state.hitStat.onExpired(req.getKey());
             if (item.isUpdateBackoff()) {
                 log.trace("({})缓存过期，更新请求Backoff中，key={}", cacheName, key);
-                responser.send(item.getData(), self());
+                responser.send(item.getDataAndUpdateLastRequestTime(), self());
             } else {
                 item.onRequestUpdate(state.config.getMaxBackoff());
                 if (state.config.waitForRespond()) {
@@ -167,14 +170,14 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
                     requestData(key, responser);
                 } else {
                     log.trace("({})缓存过期，发起更新请求，暂时使用旧数据返回请求者，key={}", cacheName, key);
-                    responser.send(item.getData(), self());
+                    responser.send(item.getDataAndUpdateLastRequestTime(), self());
                     requestData(key, doNothing);
                 }
             }
         } else {//数据未过期
             state.hitStat.onHit(req.getKey());
             log.trace("({})命中缓存，key={}", cacheName, key);
-            responser.send(item.getData(), self());
+            responser.send(item.getDataAndUpdateLastRequestTime(), self());
         }
     }
 
@@ -217,7 +220,7 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
             } else {
                 log.warn("({})请求新数据失败；使用旧数据返回请求者，key={}", cacheName, failed.key, failed.error);
             }
-            failed.responser.send(item.getData(), self());
+            failed.responser.send(item.getDataAndUpdateLastRequestTime(), self());
         }
     }
     //-------------------------------------------------------------------------------------
@@ -230,7 +233,7 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
             log.debug("({})标记缓存为脏数据，key={}", cacheName, event.key);
             item.markDirty();
         }
-        state.dataSource.afterDirtyMarked(self(), cacheName, event);
+        state.dataSource.afterDirtyMarked(self(), cacheName, event.key);
     }
     //-------------------------------------------------------------------------------------
     protected void onSuccessData(final TKey key, final Future<TimedData<TData>> future, IResponser responser) {
@@ -305,7 +308,17 @@ public abstract class AbstractCacheActor<TKey, TData> extends UntypedActor {
     protected void handleUpdateTick() {
         log.trace("{} cacheMap.size = {}",state.config.getCacheName(),state.cacheMap.size());
         for (CachedItem<TKey,TData> item : state.cacheMap.values()) {
-            boolean isAutoUpdate = state.config.isAutoUpdateExpiredData(item.key);
+            TData data = item.timedData.data; //注意此处不能用getData()，getData（）会更新最后缓存访问时间，会造成idle无法过期
+            boolean isAutoUpdate = state.dataSource.isAutoUpdateExpiredData(item.key, data);
+            //-------------------------------------------------------------
+            //todo: 0.7.4.1暂时的兼容0.7.4处理，升级到0.7.5版本后删除此兼容
+            //此时isAutoUpdate为true说明，已经实现了IDataSource.isAutoUpdateExpiredData,无需再做兼容处理
+            //               为false则做兼容处理：1、如果实现了新接口，必然会删除config.isAutoUpdateExpiredData的代码，此时默认返回也为false不会有副作用
+            //                                  2、未实现，用旧接口结果即为兼容要的效果
+            if (!isAutoUpdate) {
+                isAutoUpdate=state.config.isAutoUpdateExpiredData(item.key);
+            }
+            //-----------------------------------------------------------
             if (isAutoUpdate && item.isExpired()) {
                 log.debug("{} auto update {}",state.config.getCacheName(),item.key);
                 requestData(item.key, doNothing);

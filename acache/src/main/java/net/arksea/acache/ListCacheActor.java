@@ -42,24 +42,13 @@ public class ListCacheActor<TKey> extends AbstractCacheActor<TKey,List> {
         return pool.props(props(cacheConfig, cacheSource, hitStat));
     }
 
-    @Override
-    @SuppressWarnings("unchecked")
-    public void onReceive(Object o) {
-        if (o instanceof ServiceRequest) {
-            ServiceRequest req = (ServiceRequest) o;
-            onReceiveCacheMsg(req.message, req);
-        } else {
-            onReceiveCacheMsg(o, null);
-        }
-    }
-
-    private void onReceiveCacheMsg(Object o, ServiceRequest serviceRequest) {
+    protected void onReceiveCacheMsg(Object o, ServiceRequest serviceRequest) {
         if (o instanceof GetRange) {
             handleGetRange((GetRange<TKey>) o, serviceRequest);
         } else if (o instanceof GetSize) {
             handleGetSize((GetSize<TKey>) o, serviceRequest);
         } else {
-            super.onReceive(o);
+            super.onReceiveCacheMsg(o, serviceRequest);
         }
     }
 

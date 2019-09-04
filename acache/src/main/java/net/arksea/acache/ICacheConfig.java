@@ -21,10 +21,11 @@ public interface ICacheConfig<TKey> {
     };
 
     /**
-     * 缓存过期是否自动更新
+     * 缓存过期是否自动更新, 使用IDataSource.isAutoUpdateExpiredData
      * @param key
      * @return
      */
+    @Deprecated
     default boolean isAutoUpdateExpiredData(TKey key) {
         return false;
     };
