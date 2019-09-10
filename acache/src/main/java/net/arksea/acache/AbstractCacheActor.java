@@ -261,6 +261,7 @@ public abstract class AbstractCacheActor<TKey, TData> extends AbstractActor {
             public void onFailure(Throwable error) throws Throwable {
                 Failed failed = new Failed<>(key,responser, error);
                 cacheActor.tell(failed, ActorRef.noSender());
+                state.dataSource.onRequestFailed(self(),state.config.getCacheName(), key);
             }
         };
         future.onFailure(onFailure, context().dispatcher());
@@ -282,6 +283,7 @@ public abstract class AbstractCacheActor<TKey, TData> extends AbstractActor {
                 log.trace("{} idleExpiredTime={}  idleExpiredTime-now={}",state.config.getCacheName(),idleExpiredTime,idleExpiredTime-now);
                 if (now > idleExpiredTime) {
                     expired.add(item);
+                    state.hitStat.onIdleRemoved(item.key);
                     continue;
                 }
             }
@@ -289,6 +291,7 @@ public abstract class AbstractCacheActor<TKey, TData> extends AbstractActor {
             //因为getData()会修改lastRequestTime，让item的idle无法过期
             if (item.isExpired() && item.isRemoveOnExpired()) {
                 expired.add(item);
+                state.hitStat.onExpiredRemoved(item.key);
             }
         }
         log.trace("{} expired.size = {}",state.config.getCacheName(),expired.size());
@@ -300,6 +303,7 @@ public abstract class AbstractCacheActor<TKey, TData> extends AbstractActor {
             state.cacheMap.remove(it.key);
         }
         expired.clear();
+        state.hitStat.setSize(state.cacheMap.size());
     }
 
     /**

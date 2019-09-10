@@ -18,6 +18,7 @@ class CachedItem<TKey, TData> {
 
     public CachedItem(final TKey key) {
         this.key = key;
+        this.lastRequestTime = System.currentTimeMillis();
     }
 
     //注意，注意，注意： 此处的getData会更新最后缓存访问时间，不适当的访问可能造成idle无法过期
