@@ -115,3 +115,62 @@ class Test {
     }
 }
 ```
+
+#### 支持缓存监控
+
+![image](./docs/images/grafana1.png) ![image](./docs/images/grafana2.png)
+
+缓存对象创建时允许传入一个IHitStat接口的实现，缓存在被访问时会根据命中情况调用此接口方法，接口定义:
+```java
+public interface IHitStat<Key> {
+    default void onRequest(Key key){}       //请求, 请求数 = Hit + Expired + Miss
+    default void onHit(Key key){}           //命中
+    default void onExpired(Key key){}       //过期
+    default void onMiss(Key key){}          //未命中
+    default void onIdleRemoved(Key key){}   //闲置移除
+    default void onExpiredRemoved(Key key){}//超时移除
+    default void setSize(long size) {}      //缓存条数
+}
+```
+
+AbstractHitStatService实现了此接口，生成InfluxDB的日志格式，从此类继承只要实现写InfluxDB的post请求：
+
+```java
+@Component("locateHitStatService")
+public class LocateHitStatService extends AbstractHitStatService<LocateRequest> {
+    private static final Logger logger = LogManager.getLogger(LocateHitStatService.class);
+    private final String dbUrl = "http://10.79.186.100:8086/write?db=tianqi"; //InfluxDB接口地址
+
+    @Autowired
+    private ActorSystem system;
+
+    @Value("${httpclient.askTimeout}")
+    private int askTimeout;
+
+    @Resource(name = "logHttpClient")
+    private FuturedHttpClient logHttpClient;
+
+    protected void doWriteLogs(String lines) {
+        HttpPost post = new HttpPost(dbUrl);
+        post.setEntity(new StringEntity(lines, "UTF-8"));
+        logHttpClient.ask(new HttpAsk("request", post), askTimeout).onComplete(
+            new OnComplete<HttpResult>() {
+                @Override
+                public void onComplete(Throwable ex, HttpResult ret) {
+                    if (ex == null) {
+                        if (ret.error == null) {
+                            int code = ret.response.getStatusLine().getStatusCode();
+                            if (code != 204 && code != 200) {
+                                logger.warn("Write cache hit stat data failed, result={}", ret.value);
+                            }
+                        } else {
+                            logger.warn("Write cache hit stat data failed", ret.error);
+                        }
+                    } else {
+                        logger.warn("Write cache hit stat data failed", ex);
+                    }                        
+                }
+            }, system.dispatcher());
+    }
+}
+```
