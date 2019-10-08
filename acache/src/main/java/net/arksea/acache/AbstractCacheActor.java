@@ -303,7 +303,7 @@ public abstract class AbstractCacheActor<TKey, TData> extends AbstractActor {
             state.cacheMap.remove(it.key);
         }
         expired.clear();
-        state.hitStat.setSize(state.cacheMap.size());
+        state.hitStat.setSize(state, state.cacheMap.size());
     }
 
     /**
