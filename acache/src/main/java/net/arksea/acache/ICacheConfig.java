@@ -22,11 +22,9 @@ public interface ICacheConfig<TKey> {
 
     /**
      * 缓存过期是否自动更新, 使用IDataSource.isAutoUpdateExpiredData
-     * @param key
      * @return
      */
-    @Deprecated
-    default boolean isAutoUpdateExpiredData(TKey key) {
+    default <TData> boolean isAutoUpdateExpiredData(TKey key, TData data) {
         return false;
     };
     default long getAutoUpdatePeriod() {
@@ -51,5 +49,9 @@ public interface ICacheConfig<TKey> {
      */
     default boolean waitForRespond() { return false; }
     default List<TKey> getInitKeys() { return null; }
+    //List类型的数据，在请求时会分多次请求，每次请求的量由此接口确定
+    default int getListDataRequestSize() {
+        return 20;
+    }
 }
 

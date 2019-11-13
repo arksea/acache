@@ -43,7 +43,7 @@ class GetDataResponser implements IResponser<TimedData> {
     @Override
     public void failed(Throwable ex,ActorRef sender) {
         Object result = new DataResult<>(ex, cacheName, get.key);
-        Object msg = request == null ?  result : new ServiceResponse(result, request);
+        Object msg = request == null ?  result : new ServiceResponse(result, request, false);
         receiver.tell(msg, sender);
     }
 }
@@ -72,7 +72,7 @@ class GetRangeResponser implements IResponser<TimedData<List>> {
     @Override
     public void failed(Throwable ex,ActorRef sender) {
         Object result = new DataResult<>(ex, cacheName, get.key);
-        Object msg = request == null ?  result : new ServiceResponse(result, request);
+        Object msg = request == null ?  result : new ServiceResponse(result, request, false);
         receiver.tell(msg, sender);
     }
 }
@@ -97,7 +97,7 @@ class GetSizeResponser implements IResponser<TimedData<List>> {
     @Override
     public void failed(Throwable ex,ActorRef sender) {
         Integer result = -1;
-        Object msg = request == null ?  result : new ServiceResponse(result, request);
+        Object msg = request == null ?  result : new ServiceResponse(result, request, false);
         receiver.tell(msg, sender);
     }
 }
