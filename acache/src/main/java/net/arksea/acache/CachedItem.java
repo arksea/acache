@@ -8,7 +8,7 @@ import org.apache.logging.log4j.Logger;
  * Created by arksea on 2016/11/17.
  */
 class CachedItem<TKey, TData> {
-    private static final int MIN_RETRY_BACKOFF = 3000; //数据采集失败后的最小退避时间（毫秒）
+    private static final int MIN_RETRY_BACKOFF = 30000; //数据采集失败后的最小退避时间（毫秒）
     private static final Logger logger = LogManager.getLogger(CachedItem.class);
     public final TKey key;    //缓存的Key
     TimedData<TData> timedData = new TimedData<TData>(0, null);   //缓存的数据
