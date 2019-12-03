@@ -221,7 +221,7 @@ public class LocalCacheCreator {
                 }
             }
             private Future<TimedData<List>> request(TKey key, long timeout1) {
-                int COUNT = 20;
+                int COUNT = localCacheConfig.getListDataRequestSize();
                 Duration duration = Duration.create(initTimeout,"ms");
                 Future<Integer> futureSize = remoteCacheAsker.getSize(key);
                 try {

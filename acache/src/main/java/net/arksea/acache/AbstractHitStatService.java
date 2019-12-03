@@ -1,6 +1,9 @@
 package net.arksea.acache;
 
 import org.apache.commons.lang3.StringUtils;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -14,7 +17,7 @@ public abstract class AbstractHitStatService<Key> implements IHitStat<Key> {
     private AtomicLong miss    = new AtomicLong(0L);
     private AtomicLong idleRemoved = new AtomicLong(0L);
     private AtomicLong expiredRemoved = new AtomicLong(0L);
-    private AtomicLong size = new AtomicLong(0L);
+    private Map<Object,AtomicLong> sizeMap = new ConcurrentHashMap<>();
 
     protected abstract void doWriteLogs(String body);
 
@@ -49,8 +52,14 @@ public abstract class AbstractHitStatService<Key> implements IHitStat<Key> {
     }
 
     @Override
-    public void setSize(long n) {
-        this.size.set(n);
+    public void setSize(Object tag,long size) {
+        AtomicLong a = sizeMap.get(tag);
+        if (a == null) {
+            a = new AtomicLong(size);
+            sizeMap.put(tag, a);
+        } else {
+            a.set(size);
+        }
     }
 
     public void writeLogs() {
@@ -68,7 +77,7 @@ public abstract class AbstractHitStatService<Key> implements IHitStat<Key> {
         long miss = this.miss.getAndSet(0L);
         long idleDel = this.idleRemoved.getAndSet(0L);
         long expDel = this.expiredRemoved.getAndSet(0L);
-        long size = this.size.get();
+        long size = sizeMap.values().stream().mapToLong(it -> it.get()).sum();
         if (req>0 || hit>0 || exp>0 || miss>0) {
             sb.append("hitstat,name=locate")
                     .append(" request=").append(req)

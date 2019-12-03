@@ -18,7 +18,7 @@ import static akka.japi.Util.classTag;
  * syncGet是同步访问，仅建议用于测试或者特殊的情境
  * Created by arksea on 2016/11/17.
  */
-public final class CacheAsker<K,V> implements ICacheAsker<K,V> {
+public class CacheAsker<K,V> implements ICacheAsker<K,V> {
 
     public final long timeout;
     public final ActorSelection cacheActor;
