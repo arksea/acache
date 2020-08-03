@@ -4,6 +4,7 @@ import akka.actor.ActorRef;
 import akka.actor.ActorRefFactory;
 import akka.actor.ActorSelection;
 import akka.actor.Props;
+import akka.dispatch.Futures;
 import akka.dispatch.Mapper;
 import akka.routing.ConsistentHashingRouter;
 import net.arksea.base.FutureUtils;
@@ -17,6 +18,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 
 /**
@@ -26,6 +28,10 @@ import java.util.function.Function;
 public class LocalCacheCreator {
     private static final Logger logger = LogManager.getLogger(LocalCacheCreator.class);
     private static final int LOCAL_ASKER_DELAY = 100; //asker 需要比source多一些的超时时间用于返回本地数据
+    private static final AtomicLong DEFAULT_EXPIRED_SECONDS = new AtomicLong(300); //默认空数组过期时间5分钟
+    public static final void setDefaultExpiredSeconds(long sec) {
+        DEFAULT_EXPIRED_SECONDS.set(sec);
+    }
     public static <TKey,TData> CacheAsker<TKey,TData> createLocalCache(ActorRefFactory actorRefFactory,
                                                                        ICacheConfig<TKey> localCacheConfig,
                                                                        final ICacheAsker<TKey, TData> remoteCacheAsker,
@@ -257,11 +263,12 @@ public class LocalCacheCreator {
                                 return new TimedData<>(time, data);
                             }), actorRefFactory.dispatcher()
                         );
-                    } else if (size == 0) {
-                        throw new RuntimeException("更新本地缓存失败, 列表长度为0：key="+key);
                     } else {
-                        throw new RuntimeException("更新本地缓存失败, 未能获取列表长度：key="+key);
+                        long expiredTime = System.currentTimeMillis() + DEFAULT_EXPIRED_SECONDS.get()*1000;
+                        return Futures.successful(new TimedData<>(expiredTime, new LinkedList<>()));
                     }
+                } catch (CacheSourceException ex) {
+                    throw ex;
                 } catch(Exception ex) {
                     throw new RuntimeException("更新本地缓存失败, 未能获取列表长度：key="+key, ex);
                 }
