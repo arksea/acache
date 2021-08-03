@@ -29,7 +29,7 @@ configure(install.repositories.mavenInstaller) {
 repositories {
     mavenLocal()
     maven { url "http://172.17.149.8:8081/nexus/content/groups/public/" }
-    maven { url "http://repo.maven.apache.org/maven2" }
+    maven { url "https://repo.maven.apache.org/maven2" }
 }
 
 uploadArchives {
